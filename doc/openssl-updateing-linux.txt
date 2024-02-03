@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------
+# -- RGP, THis file deals with removing and old version of OpenSSL   -- 
+# --      from a Ubunto build such as 18.04. Newer Ubuntu builds use --
+# --      OpenSSL 1.1.1f.                                            --
+# --      Bank Society Gold supports openssl on linus rtos           --
+# ---------------------------------------------------------------------
+
+
+== remove existing openssl (1.0.1), if openssl 1.1.1 exists leave as is.
+sudo apt-get autoremove openssl
+cd /opt
+== if /opt/openssl exists, remove it. Otherwise do NOTHING
+rm -r /opt/openssl
+
+== Download openssl 1.1.1f
+== Ensure that the download is available in your current folder
+wget http://www.openssl.org/source/openssl-1.1.1f.tar.gz --no-check-certificate
+mv openssl-1.1.1f.tar.gz dependsBSG
+
+# folder must be defined somewhere, it should be reference in makefile.unix
+
+cd coin_depends 
+== Extract openssl 1.1.1f
+tar -xvzf openssl-1.1.1f.tar.gz
+cd openssl-1.1.1f
+== Build openssl-1.1.1f
+sudo ./config --prefix=/opt/openssl --openssldir=/opt/openssl/ssl
+sudo make
+
+# sudo make install may fail use install_sw software only
+make install_sw 
+
+# Define a symbolic link for access to 1.1.1f
+sudo ln -s /opt/openssl/bin/openssl /usr/bin/openssl

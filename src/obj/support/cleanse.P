@@ -1,0 +1,16 @@
+obj/support/cleanse.o: support/cleanse.cpp support/cleanse.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/crypto.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/e_os2.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/safestack.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/stack.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/ossl_typ.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/cryptoerr.h \
+ ../../coin_depends/openssl-1.1.1f/include/openssl/symhacks.h
+support/cleanse.cpp support/cleanse.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/crypto.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/e_os2.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/safestack.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/stack.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/ossl_typ.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/cryptoerr.h :
+ ../../coin_depends/openssl-1.1.1f/include/openssl/symhacks.h :
