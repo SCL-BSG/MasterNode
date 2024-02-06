@@ -1,4 +1,4 @@
-Bank Society Coin Gold is a free open source decentralized project forked from Bitcoin.
+Bank Society Coin Gold is a free open source decentralized project forked from Bitcoin. [a long time ago]
 
 NOTE : UBUNTU 20.04 update, no longer available with UBUNTU 18.04 (now EOL)
 
