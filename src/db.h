@@ -116,8 +116,6 @@ protected:
         if (!pdb)
             return false;
 
-printf(" Level DB Read %s key %d index \n", key, value );
-
         // Key
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(1000);

@@ -50,7 +50,7 @@ class CWallet;
 //    size_t operator()(const uint256& hash) const { return hash.GetLow64(); }
 //};
 typedef map<uint256, CBlockIndex*> BlockMap;
-extern BlockMap mapBlockIndexmice;
+extern BlockMap mapBlockIndex;
 
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
 static const unsigned int MAX_BLOCK_SIZE = 30000000;  //30MB
@@ -396,14 +396,12 @@ public:
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
-        
+        //LogPrintf("RG ReadFromDisk entry %d file pos \n", pos.nBlockPos );
         //RGP : Found an error every 15 seconds when called from ConnectBlock to FetchInputs
         //      This issue needs investigating later...
         //      I am guessu=ing that the read is at the end of the file?
         
         CAutoFile filein = CAutoFile(  OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
- 
-         
  
         if (filein.IsNull())
         {
@@ -434,6 +432,29 @@ public:
         
         return true;
     }
+
+// MYCE Open history file to read
+//    CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
+//    if (filein.IsNull())
+//        return error("CBlockUndo::ReadFromDisk : OpenBlockFile failed");
+//    // Read block
+//    uint256 hashChecksum;
+//    try {
+//        filein >> *this;
+//        filein >> hashChecksum;
+//    } catch (std::exception& e) {
+//        return error("%s : Deserialize or I/O error - %s", __func__, e.what());
+//    }
+//    // Verify checksum
+//    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
+//    hasher << hashBlock;
+//    hasher << *this;
+//    if (hashChecksum != hasher.GetHash())
+//        return error("CBlockUndo::ReadFromDisk : Checksum mismatch");
+//    return true;
+
+
+
 
     friend bool operator==(const CTransaction& a, const CTransaction& b)
     {

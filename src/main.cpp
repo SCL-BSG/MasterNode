@@ -60,11 +60,8 @@ CCriticalSection cs_main;
 
 CTxMemPool mempool;
 
-// original 
-map<uint256, CBlockIndex*> mapBlockIndex;
-
 // from MYCE
-BlockMap mapBlockIndexmice;
+BlockMap mapBlockIndex;
 CChain chainActive;
 // from MYCE
 
@@ -662,8 +659,6 @@ int CMerkleTx::SetMerkleBranch(const CBlock* pblock)
     if (pblock == NULL) {
         // Load the block this tx is in
         CTxIndex txindex;
-        
-LogPrintf("RGP CMerkleTx::SetMerkleBranch before ReadTxIndex \n");
         if (!CTxDB("r").ReadTxIndex(GetHash(), txindex))
             return 0;
         if (!blockTmp.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos)) {
@@ -1354,7 +1349,6 @@ int GetIXConfirmations(uint256 nTXHash)
 int CTxIndex::GetDepthInMainChain() const
 {
     // Read block header
-LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 800 \n");
     CBlock block;
     if (!block.ReadFromDisk(pos.nFile, pos.nBlockPos, false))
         return 0;
@@ -1381,14 +1375,9 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
         }
         CTxDB txdb("r");
         CTxIndex txindex;
-        
-LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 801 %d \n", txindex.pos.nBlockPos );        
-        
-        
         if (tx.ReadFromDisk(txdb, hash, txindex))
         {
             CBlock block;
-LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 802 %d \n", txindex.pos.nBlockPos ); 
             if (block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
                 hashBlock = block.GetHash();
             return true;
@@ -1400,7 +1389,6 @@ LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 802 %d \n
             if (pindex == pindexBest || pindex->pnext != 0)
                 continue;
             CBlock block;
-LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 803 %d \n", txindex.pos.nBlockPos ); 
             if (!block.ReadFromDisk(pindex))
                 continue;
             BOOST_FOREACH(const CTransaction& txOrphan, block.vtx)
@@ -1960,7 +1948,7 @@ static CBlockIndex* pindexLastBest;
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
 {
-LogPrintf("RGP InvalidChainFound Debug 001 %s \n", pindexNew->ToString() );
+LogPrintf("RGP InvalidChainFound Debug 001 \n");
     if (pindexNew->nChainTrust > nBestInvalidTrust)
     {
 LogPrintf("RGP InvalidChainFound Debug 002 \n");
@@ -1981,10 +1969,6 @@ LogPrintf("RGP InvalidChainFound Debug 003 \n");
       CBigNum(pindexBest->nChainTrust).ToString(),
       nBestBlockTrust.Get64(),
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()));
-      
-      
-      
-      
 }
 
 
@@ -2018,64 +2002,24 @@ bool CTransaction::DisconnectInputs(CTxDB& txdb)
     // Relinquish previous transactions' spent pointers
     if (!IsCoinBase())
     {
-    
-    LogPrintf("RGP CTransaction::DisconnectInputs \n");
-        //
-        // class CTxDB access to LevelDB, where the blockchain is managed. (folder in .Society/txleveldb)
-        // class CTxIn is of class CTxIn, where 'prevout' is a class variable of type CoutPoint
-        // CoutPoint is a class COutPoint in core.h
-        // class CTransaction
-        //    std::vector<CTxIn> vin;
-        //    std::vector<CTxOut> vout;
-        //    class COutPoint defines prevout (previous block hash )
-        //
-        // class CTxIn is 
-        //
-        //   COutPoint prevout;
-        //   CScript scriptSig;
-        //   CScript prevPubKey;
-        //   unsigned int nSequence;
-        
-        
         BOOST_FOREACH(const CTxIn& txin, vin)
         {
-        
-            // RGP, txin holds the previous transaction     
-              
-LogPrintf("RGP CTransaction::DisconnectInputs %s Previous transaction hash \n", txin.prevout.hash.ToString());       
-            if ( txin.prevout.hash.ToString() == "9038f84cbd49013aaa328941238659be8d4e2ee8f19e056a5471ce83dbfb3249" )
-            {
-               // This one of the bad blocks caused at block 575697 ignore it
-               continue;
-            }
             COutPoint prevout = txin.prevout;
 
-            // Get prev txindex from disk, read using the hash txin.previous.hash
+            // Get prev txindex from disk
             CTxIndex txindex;
             if (!txdb.ReadTxIndex(prevout.hash, txindex))
-            {
-LogPrintf("RGP DisconnectInputs prevout.hash %s \n \n", prevout.hash.ToString() );
-            	// RGP removing the error() call as it affects MN processing
-                // return error("DisconnectInputs() : ReadTxIndex failed");
-                LogPrintf("DisconnectInputs() : ReadTxIndex failed\n");
-                
-                // If this entry is not read from the data stream, let's try to delete
-                
-                
-                //return false;
-	    }
-	    else
-	    {
-            	if (prevout.n >= txindex.vSpent.size())
-               	 return error("DisconnectInputs() : prevout.n out of range");
+                return error("DisconnectInputs() : ReadTxIndex failed");
 
-            	// Mark outpoint as not spent
-            	txindex.vSpent[prevout.n].SetNull();
+            if (prevout.n >= txindex.vSpent.size())
+                return error("DisconnectInputs() : prevout.n out of range");
 
-            	// Write back
-            	if (!txdb.UpdateTxIndex(prevout.hash, txindex))
-               	 return error("DisconnectInputs() : UpdateTxIndex failed");
-	    }
+            // Mark outpoint as not spent
+            txindex.vSpent[prevout.n].SetNull();
+
+            // Write back
+            if (!txdb.UpdateTxIndex(prevout.hash, txindex))
+                return error("DisconnectInputs() : UpdateTxIndex failed");
         }
     }
 
@@ -2098,7 +2042,7 @@ bool CTransaction::FetchInputs(CTxDB& txdb, const map<uint256, CTxIndex>& mapTes
     // be dropped).  If tx is definitely invalid, fInvalid will be set to true.
     fInvalid = false;
     
-LogPrintf("RGP FetchInputs Debug 001 \n");
+//LogPrintf("RGP FetchInputs Debug 001 \n");
 MilliSleep(1);
 
     if (IsCoinBase())
@@ -2126,7 +2070,7 @@ MilliSleep(1);
         if (!fFound && (fBlock || fMiner))
         {
 	    fInvalid = false;
-	    LogPrintf("RGP Debug FetchInputs() %d fBlock %d fMiner \n", fBlock, fMiner);
+	    //LogPrintf("RGP Debug FetchInputs() %d fBlock %d fMiner \n", fBlock, fMiner);
             //return fMiner ? false : LogPrintf("FetchInputs() : %s prev tx %s index entry not found", GetHash().ToString(),  prevout.hash.ToString());
             // RGP it's not an error, it's caused by the mined block being invalid 
             //return fMiner ? false : error("FetchInputs() : %s prev tx %s index entry not found", GetHash().ToString(),  prevout.hash.ToString());
@@ -2333,30 +2277,15 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs, map<uint256, CTx
 
 bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 {
-
-LogPrintf("RGP Debug DisconnectBlock pindex %s \n ", pindex->ToString() );
-
     // Disconnect in reverse order
-    
-LogPrintf("RGP DEBUG DisconnectBlock check of DisconnectInputs logic %d vtx size \n", vtx.size() );
     for (int i = vtx.size()-1; i >= 0; i--)
-    {
         if (!vtx[i].DisconnectInputs(txdb))
-        {
-LogPrintf("RGP Debug DisconnectBlock, DisconectInputs FAIL! \n");
             return false;
-	}
-	
-    }
-
-LogPrintf("RGP Debug DisconnectBlock pindex %s \n \n pindex->pprev %s \n \n", pindex->ToString(), pindex->pprev->ToString() );
 
     // Update block index on disk without changing it in memory.
     // The memory index structure will be changed after the db commits.
     if (pindex->pprev)
     {
-LogPrintf(" RGP Debug DisconnectBlock pindex->pprev is not zero \n");
-
         CDiskBlockIndex blockindexPrev(pindex->pprev);
         blockindexPrev.hashNext = 0;
         if (!txdb.WriteBlockIndex(blockindexPrev))
@@ -2487,6 +2416,7 @@ void CBlock::RebuildAddressIndex(CTxDB& txdb)
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
 
+//LogPrintf("RGP DEBUG ConnectBlock Start \n");
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(!fJustCheck, !fJustCheck, false))
     {
@@ -2536,10 +2466,11 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             nValueOut += tx.GetValueOut();
         else
         {
-       
+//LogPrintf("RGP DEBUG ConnectBlock Debug 010 \n");        
             bool fInvalid;
             if (!tx.FetchInputs(txdb, mapQueuedChanges, true, false, mapInputs, fInvalid))
             {
+//LogPrintf("RGP DEBUG ConnectBlock Debug 011 \n");
                 return false;
             }
 
@@ -2708,8 +2639,6 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
     CBlockIndex* pfork = pindexBest;
     CBlockIndex* plonger = pindexNew;
 
-LogPrintf("RGP Debug Reorganize entry pindexBest %s \n pindexNew %s \n",  pindexBest->ToString() , pindexNew->ToString() );
-
     while (pfork != plonger)
     {
         while (plonger->nHeight > pfork->nHeight)
@@ -2730,13 +2659,8 @@ LogPrintf("RGP Debug Reorganize entry pindexBest %s \n pindexNew %s \n",  pindex
     // List of what to disconnect
     vector<CBlockIndex*> vDisconnect;
     for (CBlockIndex* pindex = pindexBest; pindex != pfork; pindex = pindex->pprev)
-    {
-        LogPrintf("RGP Debug Reorganize list of what to disconnect pindex %s \n",  pindex->ToString() );
         vDisconnect.push_back(pindex);
-    }
-    
-    LogPrintf("RGP debug DisconnectBlock count of vDisconnect %d \n", vDisconnect.size() );
-    
+
     // List of what to connect
     vector<CBlockIndex*> vConnect;
     for (CBlockIndex* pindex = pindexNew; pindex != pfork; pindex = pindex->pprev)
@@ -2748,26 +2672,16 @@ LogPrintf("RGP Debug Reorganize entry pindexBest %s \n pindexNew %s \n",  pindex
         LogPrintf("REORGANIZE: Connect %u blocks; %s..%s\n", vConnect.size(), pfork->GetBlockHash().ToString(), pindexNew->GetBlockHash().ToString());
     }
 
-    LogPrintf("RGP debug DisconnectBlock count of vConnect %d \n", vConnect.size() );
-
     // Disconnect shorter branch
     list<CTransaction> vResurrect;
     BOOST_FOREACH(CBlockIndex* pindex, vDisconnect)
     {
         CBlock block;
         if (!block.ReadFromDisk(pindex))
-            return error("Reorganize() : ReadFromDisk for disconnect failed"); 
-            
-        // 
-        // RGP note that the failure in the MN fails in DisconnectBlock \n);
-        //
+            return error("Reorganize() : ReadFromDisk for disconnect failed");
         if (!block.DisconnectBlock(txdb, pindex))
-        {
-            // RGP removed, affecting Master Node
-            // return error("Reorganize() : DisconnectBlock %s failed", pindex->GetBlockHash().ToString());
-            LogPrintf("Reorganize() : DisconnectBlock %s failed\n", pindex->GetBlockHash().ToString());
-            return false;
-	}   
+            return error("Reorganize() : DisconnectBlock %s failed", pindex->GetBlockHash().ToString());
+
         // Queue memory transactions to resurrect.
         // We only do this for blocks after the last checkpoint (reorganisation before that
         // point should only happen with -reindex/-loadblock, or a misbehaving peer.
@@ -2775,8 +2689,6 @@ LogPrintf("RGP Debug Reorganize entry pindexBest %s \n pindexNew %s \n",  pindex
             if (!(tx.IsCoinBase() || tx.IsCoinStake()) && pindex->nHeight > Checkpoints::GetTotalBlocksEstimate())
                 vResurrect.push_front(tx);
     }
-
-LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 805 \n"); 
 
     // Connect longer branch
     vector<CTransaction> vDelete;
@@ -2843,11 +2755,11 @@ bool CBlock::SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew)
     //if (!ConnectBlock(txdb, pindexNew) || !txdb.WriteHashBestChain(hash))
     if (!ConnectBlock(txdb, pindexNew) )
     {
-
+//LogPrintf("*** RGP SetBestChainInner Debug 002 \n");
 MilliSleep(1);
         if ( !txdb.WriteHashBestChain(hash) )
         {
-
+//LogPrintf("*** RGP SetBestChainInner Debug 003 \n");
 MilliSleep(1);
            txdb.TxnAbort();
            LogPrintf("*** RGP SetBestChainInner Debug 004 \n");
@@ -2855,14 +2767,14 @@ MilliSleep(1);
 
            return false;
         }
-
+//LogPrintf("*** RGP SetBestChainInner Debug 005 OK \n");
         MilliSleep(1);
     }
     
     
     if (!txdb.TxnCommit())
     {
-        return error("SetBestChainInner() : TxnCommit failed");
+        return error("SetBestChain() : TxnCommit failed");
     }
 
     // Add to current best branch
@@ -2875,32 +2787,11 @@ MilliSleep(1);
     return true;
 }
 
-/* -----------------------------------------------------------------
-   -- SetBestChain --                                             --
-   ----------------------------------------------------------------- */
-
-
 bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 {
     uint256 hash = GetHash();
 
 MilliSleep(1);
-
-//LogPrintf("RGP Debug SetBestChain pindexnew %s \n", pindexNew->ToString() );
-
-if (hashPrevBlock != hashBestChain)
-{
-   /* ----------------------------------------------------------------------------------------------
-      -- RGP, this means that somehow the system has recorded an invalid  block in the blockchain --
-      --      Let's determine the last block in the chain and delete it.
-      --      We need what we have available here first
-      ---------------------------------------------------------------------------------------------- */
-      
-   printf("RGP SetBestChain establish the invalid block, previous is \n %s \n Best Chain is %s \n", hashPrevBlock.ToString() , hashBestChain.ToString() );
-
-   return false; /* error("SetBestChain() : Invalid Block\n") */
-}
-
 
     if (!txdb.TxnBegin())
         return error("SetBestChain() : TxnBegin failed");
@@ -2908,7 +2799,7 @@ if (hashPrevBlock != hashBestChain)
 MilliSleep(1);
     if (pindexGenesisBlock == NULL && hash == Params().HashGenesisBlock())
     { 
-LogPrintf("RGP Debug SetBestChain genesis block test condition \n" );
+
 MilliSleep(5);
         txdb.WriteHashBestChain(hash);
 
@@ -2922,78 +2813,52 @@ MilliSleep(5);
     }
     else if (hashPrevBlock == hashBestChain)
     {
-//LogPrintf("RGP Debug SetBestChain prev is equal to new best chain, correct!!! \n");
+
 MilliSleep(5);
         if (!SetBestChainInner(txdb, pindexNew))
         {
-LogPrintf("RGP Debug SetBestChain set best chain INNER FAILED \n");
+
             return error("SetBestChain() : SetBestChainInner failed");
         }
     }
     else
     {
-LogPrintf("RGP Debug SetBestChain OK new block is good to add %s \n", pindexNew->ToString() );
+
 MilliSleep(5);
 
         // the first block in the new chain that will cause it to become the new best chain
         CBlockIndex *pindexIntermediate = pindexNew;
 
         // list of blocks that need to be connected afterwards
-        //
-        // RGP check CBlockIndex* to see if this is ever more than one block?
-        //
         std::vector<CBlockIndex*> vpindexSecondary;
-
-	LogPrintf("SetBestChain %d vpindexSecondary \n", vpindexSecondary.size() );
 
         // Reorganize is costly in terms of db load, as it works in a single db transaction.
         // Try to limit how much needs to be done inside
-        
-        LogPrintf("RGP Debug SetBestchain loop base is pindexNew %s \n", pindexNew->ToString() );
-LogPrintf("\n\n\n");
-        
         while (pindexIntermediate->pprev && pindexIntermediate->pprev->nChainTrust > pindexBest->nChainTrust)
         {
-            if ( pindexIntermediate->ToString() == "5d7c9f594c3cd222e59ea68e902a60e66941f7aa0e72d44bb8bb2758971f9a41" )
-            {
-               // no Pushback
-               LogPrintf("RGP SetBestChain no pushback \n"); 
-            }
-            else
-            {
             vpindexSecondary.push_back(pindexIntermediate);
             pindexIntermediate = pindexIntermediate->pprev;
-LogPrintf("RGP DEBUG SetBest Chain pindexIntermediate LOOP %s pindexIntermediate->pprev->nChainTrust %s pindexBest->nChainTrust \n", pindexIntermediate->pprev->nChainTrust.ToString(), pindexBest->nChainTrust.ToString() );
+
             MilliSleep(1); /* RGP Optimize */
-            
-            }
         }
 
-LogPrintf("\n\n\n");
-
 MilliSleep(5);
-	//
-	// RGP now it checks the size of vpindexSecondary
-	//
+
         if (!vpindexSecondary.empty())
             LogPrintf("Postponing %u reconnects\n", vpindexSecondary.size());
             
 
 MilliSleep(5);
 
-LogPrintf("RGP DEBUG calling Reorganize in SetBest Chain() \n");
         // Switch to new best branch
         if (!Reorganize(txdb, pindexIntermediate))
         {
             txdb.TxnAbort();
             InvalidChainFound(pindexNew);
-            // RGP, disabled the error() call as it's causing the MN to lose messages and fall behind the block
-            // return error("SetBestChain() : Reorganize failed");
-            LogPrintf("SetBestChain() : Reorganize failed \n");
-            return false;
+            return error("SetBestChain() : Reorganize failed");
         }
         
-LogPrintf("*** RGP SetBestChain Debug 040 \n");
+//LogPrintf("*** RGP SetBestChain Debug 040 \n");
 MilliSleep(5);
 
         // Connect further blocks
@@ -3106,8 +2971,6 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, const CBlockIndex* pindexPrev, uint64
     CBigNum bnCentSecond = 0;  // coin age in the unit of cent-seconds
     nCoinAge = 0;
 
-LogPrintf("*** RGP CTransaction::GetCoinAge Debug 810 \n");
-
     if (IsCoinBase())
         return true;
 
@@ -3148,15 +3011,6 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const u
     uint256 hash = GetHash();
     if (mapBlockIndex.count(hash))
         return error("AddToBlockIndex() : %s already exists", hash.ToString());
-        
-if (hashPrevBlock != hashBestChain)
-{
-
-//LogPrintf("RGP SetBestChain establish the invalid block, Position is %d Best Chain is %s \n", nBlockPos , hashProof.ToString() );
-
-
-   return error("SetBestChain() : Invalid Block\n");
-}        
 
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *this);
@@ -3451,15 +3305,7 @@ bool CBlock::AcceptBlock()
 extern bool BSC_Wallet_Synching;
 extern CInv Inventory_to_Request;
 extern CNode *From_Node;
-uint256 hash, current_previous_hash, previous_hash; 
-int display_filter = 0;
-int Top_entry, bad_entry;
-int bad_block_flag;
-int bad_block_hash_index;
-uint256 bad_block_hash_list[100];
-uint256 testhash;
-uint256* pHash_pointer;
-CBlockIndex *check_index;
+uint256 hash;
 
     AssertLockHeld(cs_main);
 
@@ -3468,188 +3314,42 @@ CBlockIndex *check_index;
         return DoS(100, error("AcceptBlock() : reject unknown block version %d", nVersion));
 
     // Check for duplicate
-    hash = GetHash(); // current new block hash
-    current_previous_hash = hashPrevBlock; // current new block previous hash
-    
+    hash = GetHash();
 
-
-
+//LogPrintf("AcceptBlock start debug 001 \n");
 MilliSleep(5);
 
-    //
-    // RGP, Build a list of this hash in the blockchain, it exists or does not 
-    //      if it already exists then exit, as it's a duplicated block
-    //
     if (mapBlockIndex.count(hash))
     {
         /* We have the new block, try to get blocks from pindexbest */        
-        PushGetBlocks(From_Node, pindexBest, uint256(0) ); /* ask for again from best block, starting from Pindexbest */
+        PushGetBlocks(From_Node, pindexBest, pindexBest->GetBlockHash() ); /* ask for again from best block */
         MilliSleep( 1 );
 
         LogPrintf("*** RGP Debug Accept() Block already in MapBlockIndex \n");
 
-        return error("AcceptBlock() : block already in mapBlockIndex");
-        //return false;
+        //return error("AcceptBlock() : block already in mapBlockIndex");
+        return false;
     }
     else
     {
-        //
-        // RGP : class CBlock has hashPrevBlock in the class for the current block
-        //       Check if the previous block hash exists for the new blocks previous block link.
-        //       if the previous block is not found, we did not receive the previous message yet, 
-        //       so request it from other nodes.
-        //
-        //       if the previous block is found, we can now process this new block.
-        //
-             
+        // Get prev block index
         map<uint256, CBlockIndex*>::iterator mi_second = mapBlockIndex.find(hashPrevBlock);
         if (mi_second == mapBlockIndex.end())
         {
-            /* The Previous hash was not found in the local store, look for
+            /* The blockhash was not found in the local store, look for
                the previous blockhash, if we do not have it, ask for it */
 
-            /* Create an inventory request message, it will result in a block being returned */
-            
-           // Inventory_to_Request.type = MSG_BLOCK;
-           // Inventory_to_Request.hash = hashPrevBlock;
-           // From_Node->AskFor( Inventory_to_Request, true );
+            /* Creare and inventory request message, it will result in a block being returned */
+            Inventory_to_Request.type = MSG_BLOCK;
+            Inventory_to_Request.hash = hashPrevBlock;
+            From_Node->AskFor( Inventory_to_Request, false );
 
-            
-            display_filter++;
-            if ( display_filter == 1000 )
-            { 
-            	LogPrintf("AcceptBlock() : prev block not found asking for %s \n", current_previous_hash.ToString() );
-            	display_filter = 0;
-            }
-	    //return error ("AcceptBlock() :  Can't find previous block");
+            //LogPrintf("AcceptBlock() : prev block not found \n");
             return false;
-        }
-        else
-        {
-     	    /* The new block 'previous hash' does not match the best chain hash - Reject */
-     	    /* ask for the next block again */       
-     		       
-            previous_hash = *pindexBest->phashBlock; 
-            
-//            if ( hashPrevBlock != previous_hash )
-//            {
-//LogPrintf("RGP Acceptblock Final checks mapblockindex size is %d \n", mapBlockIndex.size() );
-//LogPrintf("RGP Acceptblock Current Block being accepted previous hash is %s \n", hashPrevBlock.ToString() );
-//LogPrintf("RGP Acceptblock currnet hash is %s \n", hash.ToString() );
-//LogPrintf("RGP AcceptBlock found that the best index HASH is not the same as the new Blocks Previous hash FAILS! \n");
-//LogPrintf("RGP AcceptBlock previous index hash %s height %d \n", previous_hash.ToString(), GetHeight() );
-//LogPrintf("RGP AcceptBlock current previous index hash %s \n", current_previous_hash.ToString() );
-            
-// Invalid block hunt
-// Process is to build a list of hash addresses that can be deleted from mapblockindex
-
- //   		Top_entry = mapBlockIndex.size();
- //   		bad_entry = GetHeight(); 
- //   		bad_block_flag = 0;	
- //   		bad_block_hash_index = 0;
-
-		//map<uint256, CBlockIndex*> mapBlockIndex;
-
-		//map < uint256, CBlockIndex* >::iterator testmap;
-		//for (auto const& x : testmap )
-		//{
-		//	std::cout << hash_table->first
-		//	          << ':'
-		//	          << hash_table->second
-		//		  << std::endl;
-		//
-		//}
-
-    		//map < CBlockIndex*, vector<CBlockIndex* > > mapNext;
- //   		for (map < uint256, CBlockIndex*>::iterator mi = mapBlockIndex.begin(); mi != mapBlockIndex.end(); ++mi)
- //   		{
- //       		CBlockIndex* pindex = (*mi).second;
- //       		pHash_pointer = pindex->phashBlock;
-        		
-        		//check_index = *pindex;
-
-//			if ( bad_block_flag == 1 && pindex->nHeight > bad_entry )
-//			{
-//				pHash_pointer = pindex->phashBlock;
-//				testhash = *pindex->phashBlock;
-				//LogPrintf("RGP testhash %d \n", *pHash_pointer);
-				
-//				LogPrintf("RGP bad block hunt last height stored is %d \n", pindex->nHeight );
-//				testhash = pindex->GetBlockHash();
-//	     			LogPrintf("RGP Block Hash is %s \n", testhash.ToString() );
-
-//				if (mapBlockIndex.count(testhash))
- //   				{
-//					LogPrintf("\n Time to delete \n\n");
-//					mapBlockIndex.erase ( testhash );
-//				}
-//				bad_block_hash_list[ bad_block_hash_index ] = *pHash_pointer ;
-				
-				
-//				bad_block_hash_index++;		
-//			}
-
-//			if ( pindex->nHeight == bad_entry )
-//			{
-//				bad_block_flag = 1;
-//	     			LogPrintf("RGP Hunt for bad blocks pindex nheight is %d \n", bad_entry );
-//	     			testhash = pindex->GetBlockHash();
-//	     			LogPrintf("RGP Block Hash is %s \n", testhash.ToString() );
-//
-//
-//			}
-			
-
-
-   		}
-
-
-		
-		if (mapBlockIndex.count(previous_hash))
-    		{
-			LogPrintf("\n Time to delete \n\n");
-			mapBlockIndex.erase ( previous_hash );
-			mapBlockIndex.clear();
-		}
-		return false;
-    
-            
-// Let's try to delete the current hash in mapBlockIndex 
-//mapBlockIndex.erase( hashPrevBlock );
-
-//mapBlockIndex.erase( previous_hash ); // Note this is the illegal one do once!!!
-
-            /* Create an inventory request message, it will result in a block being returned */
-            //Inventory_to_Request.type = MSG_BLOCK;
-            //Inventory_to_Request.hash = previous_hash;
-            //From_Node->AskFor( Inventory_to_Request, false );
-            
-            /* Ask for current block as well */
-            //Inventory_to_Request.type = MSG_BLOCK;
-            //Inventory_to_Request.hash = current_previous_hash;
-            //From_Node->AskFor( Inventory_to_Request, false );
-            
-            PushGetBlocks(From_Node, pindexBest, uint256(0) ); /* ask for again from best block */
-            
-            //PushGetBlocks(From_Node, pindexBest, pindexBest->GetBlockHash() ); /* ask for again from best block */
-
-            //LogPrintf("AcceptBlock() : asking for block hash %s \n", hashPrevBlock.ToString() );
-            
-            //Inventory_to_Rtesthashequest.type = MSG_BLOCK;
-            //Inventory_to_Request.hash = hashPrevBlock;
-            //From_Node->AskFor( Inventory_to_Request, true );
-
-		return error ("AcceptBlock() : This block can't be used, further up the chain");
-            //return false;
-            }
-            
-            
-            if ( mapBlockIndex.size() == 0 )
-                 LogPrintf("RGP Acceptblock index is ZERO \n");
         }
     }
 
-
+//LogPrintf("AcceptBlock start debug 002 \n");
 MilliSleep(5);
 
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
@@ -3824,13 +3524,8 @@ MilliSleep(1);
 MilliSleep(1);
     if (!AddToBlockIndex(nFile, nBlockPos, hashProof))
     {
-       
-    
-        LogPrintf("*** RGP Acceptblock, After AddToBlockIndex Invalid block from wallet node %s  block %d height %d \n", From_Node->addr.ToString(), nBlockPos,  nHeight );
-        // RGP removed error() call as it's upsetting the MN
-        //return error("AcceptBlock() : AddToBlockIndex failed");
-        LogPrintf("AcceptBlock() : AddToBlockIndex failed \n");
-        return false;
+        LogPrintf("*** RGP Acceptblock, Invalid block from wallet node %s \n", From_Node->addr.ToString());
+        return error("AcceptBlock() : AddToBlockIndex failed");
     }
 //LogPrintf("AcceptBlock start debug 999 \n");
 MilliSleep(1);
@@ -4053,15 +3748,11 @@ int filter = 0;
 
         if (!Accept_Status)
         {
-            //LogPrintf("*** RGP ProcessBlock failed AcceptBlock() from %s \n", pfrom->addr.ToString() );
-
-// Let's diisconnect the pfrom node to see if we can clear the issue
-	    //pfrom->fDisconnect = true; 
+            // LogPrintf("*** RGP ProcessBlock failed from %s \n", pfrom->addr.ToString() );
 
             /* Previous block is missing, let's ask for it. However, this will repeat
                backwords until it finds the correct block, could take a while         */
-            PushGetBlocks(pfrom, pindexBest, uint256(0) ); 
-            //pfrom->AskFor(CInv(MSG_BLOCK, pblock->hashPrevBlock ),  true );
+            pfrom->AskFor(CInv(MSG_BLOCK, pblock->hashPrevBlock ),  true );
 
             MilliSleep( 5 );
 
@@ -4077,10 +3768,10 @@ int filter = 0;
 
             if(!IsInitialBlockDownload()){
 
-                //if ( fDebug )
-                //{
+                if ( fDebug )
+                {
                     LogPrintf("*** RGP ProcessBlock, Masternode payment section and no IsInialBlockDownload \n");
-                //}
+                }
 
                 CScript payee;
                 CTxIn vin;
@@ -4333,7 +4024,7 @@ int filter = 0;
     /* RGP, Fast Synch Implementation, if AcceptBlock cannot
             find the previous block, then ask for it!!       */
     From_Node = pfrom;
-LogPrintf("RGP <<<<Abnormal>>> AcceptBlock call \n");
+
     // Store to disk
     if (!pblock->AcceptBlock())
     {
@@ -5102,7 +4793,7 @@ void static ProcessGetData(CNode* pfrom)
 
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             {
-LogPrintf("*** RGP ProcessGetData |n");
+
                 // Send block from disk
                 map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
@@ -5361,7 +5052,7 @@ CInv Problem_Blocks_Inv;
                 LogPrintf("VALID SUBVERSION");
             else
             {
-                LogPrintf("INvalid SUBVERSION, DISCONNECTED node %s \n", pfrom->addr.ToString() );
+                LogPrintf("INvalid SUBVERSION, DISCONNECTED");
                 pfrom->fDisconnect = true;
             }
         }
@@ -5708,7 +5399,7 @@ CInv Problem_Blocks_Inv;
             else
             {
 
-  //              LogPrintf("*** RGP Inventory, already have this hash %s \n", Inventory_Item.ToString() );
+                //LogPrintf("*** RGP Inventory, already have this hash %s \n", Inventory_Item.ToString() );
 
                 /* RGP test for synch
                    This could mean that we have the inventory,but not the actual blockchain yet
@@ -5788,7 +5479,7 @@ CInv Problem_Blocks_Inv;
                    else
                        net_request_filter--;
 
-                   PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash()  ); /* RGP change the blockhash from 0 */
+                   //PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash()  ); /* RGP change the blockhash from 0 */
                    //PushGetBlocks(pfrom, pindexBest, uint256(0));
                 }
 
@@ -6183,8 +5874,8 @@ CInv Problem_Blocks_Inv;
         /* RGP, Don't add if we already have */
         //if ( !fAlreadyHave )
         //{
-           // LogPrintf("*** RGP BLOCK message hash INventry NOT KNOWN???? %s \n", inv.hash.ToString() );
-           pfrom->AddInventoryKnown( inv );
+        //     LogPrintf("*** RGP BLOCK message hash INventry NOT KNOWN???? %s \n", inv.hash.ToString() );
+        //    pfrom->AddInventoryKnown( inv );
         //}
         //else
         //{

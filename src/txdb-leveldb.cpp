@@ -226,15 +226,8 @@ bool CTxDB::ReadAddrIndex(uint160 addrHash, std::vector<uint256>& txHashes)
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex& txindex)
 {
-LogPrintf("RGP CTxDB::ReadTxIndex Start hash %s \n", hash.ToString() );
-
     txindex.SetNull();
-    
-    if ( Read(make_pair(string("tx"), hash), txindex) )
-         return false;
-    else
-         return true;
-    
+    return Read(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex& txindex)

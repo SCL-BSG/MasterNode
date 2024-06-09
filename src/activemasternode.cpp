@@ -15,8 +15,8 @@ void CActiveMasternode::ManageStatus()
 {
     std::string errorMessage;
 
-/*    if (fDebug) */
-        LogPrintf("CActiveMasternode::ManageStatus() - Begin\n"); 
+/*    if (fDebug)
+        LogPrintf("CActiveMasternode::ManageStatus() - Begin\n"); */
 
     if(!fMasterNode) return;
 
@@ -25,7 +25,7 @@ void CActiveMasternode::ManageStatus()
 
     if(fIsInitialDownload) {
         status = MASTERNODE_SYNC_IN_PROCESS;
-        LogPrintf("CActiveMasternode::ManageStatus() - Sync in progress. Must wait until sync is complete to start masternode.\n");
+        //LogPrintf("CActiveMasternode::ManageStatus() - Sync in progress. Must wait until sync is complete to start masternode.\n");
         return;
     }
 
@@ -40,13 +40,11 @@ void CActiveMasternode::ManageStatus()
             if(!GetLocal(service)) {
                 notCapableReason = "Can't detect external address. Please use the masternodeaddr configuration option.";
                 status = MASTERNODE_NOT_CAPABLE;
-                LogPrintf("CActiveMasternode::ManageStatus() - not capable: %s\n", notCapableReason.c_str());
+                // LogPrintf("CActiveMasternode::ManageStatus() - not capable: %s\n", notCapableReason.c_str());
                 return;
             }
         } else
         {
-        
-        	LogPrintf("CActiveMasternode::ManageStatus() service is TRUE \n");
         	service = CService(strMasterNodeAddr, true);
         }
 
@@ -65,12 +63,13 @@ void CActiveMasternode::ManageStatus()
         if(pwalletMain->IsLocked()){
             notCapableReason = "Wallet is locked.";
             status = MASTERNODE_NOT_CAPABLE;
-            LogPrintf("CActiveMasternode::ManageStatus() - not capable: %s\n", notCapableReason.c_str());
+            //LogPrintf("CActiveMasternode::ManageStatus() - not capable: %s\n", notCapableReason.c_str());
             return;
         }
 
         if (status != MASTERNODE_REMOTELY_ENABLED)
         {
+            /* RGP, Fixed block indenting */
             // Set defaults
             status = MASTERNODE_NOT_CAPABLE;
             notCapableReason = "Unknown. Check debug.log for more information.\n";
@@ -86,12 +85,12 @@ void CActiveMasternode::ManageStatus()
                 {
                     notCapableReason = "Input must have least " + boost::lexical_cast<string>(MASTERNODE_MIN_CONFIRMATIONS) +
                                        " confirmations - " + boost::lexical_cast<string>(GetInputAge(vin)) + " confirmations";
-                    LogPrintf("CActiveMasternode::ManageStatus() - %s\n", notCapableReason.c_str());
+                    // LogPrintf("CActiveMasternode::ManageStatus() - %s\n", notCapableReason.c_str());
                     status = MASTERNODE_INPUT_TOO_NEW;
                     return;
                 }
 
-                LogPrintf("CActiveMasternode::ManageStatus() - Is capable master node!\n");
+                // LogPrintf("CActiveMasternode::ManageStatus() - Is capable master node!\n");
 
                 status = MASTERNODE_IS_CAPABLE;
                 notCapableReason = "";
@@ -102,11 +101,11 @@ void CActiveMasternode::ManageStatus()
                 CPubKey pubKeyMasternode;
                 CKey keyMasternode;
 
-                LogPrintf("*** RGPC ActiveMasternode::ManageStatus %s \n", strMasterNodePrivKey );
+                //LogPrintf("*** RGPC ActiveMasternode::ManageStatus %s \n", strMasterNodePrivKey );
 
                 if(!darkSendSigner.SetKey(strMasterNodePrivKey, errorMessage, keyMasternode, pubKeyMasternode))
                 {
-                    LogPrintf("ActiveMasternode::Dseep() - Error upon calling SetKey: %s\n", errorMessage.c_str());
+                    //LogPrintf("ActiveMasternode::Dseep() - Error upon calling SetKey: %s\n", errorMessage.c_str());
                     return;
                 }
 
@@ -116,7 +115,7 @@ void CActiveMasternode::ManageStatus()
 
                 if(!Register(vin, service, keyCollateralAddress, pubKeyCollateralAddress, keyMasternode, pubKeyMasternode, rewardAddress, rewardPercentage, errorMessage ))
                 {
-                   LogPrintf("CActiveMasternode::ManageStatus() - Error on Register: %s\n", errorMessage.c_str());
+                   //LogPrintf("CActiveMasternode::ManageStatus() - Error on Register: %s\n", errorMessage.c_str());
                 }
 
 
@@ -138,7 +137,7 @@ void CActiveMasternode::ManageStatus()
     //send to all peers
     if(!Dseep(errorMessage))
     {
-        LogPrintf("CActiveMasternode::ManageStatus() - Error on Ping: %s\n", errorMessage.c_str());
+        //LogPrintf("CActiveMasternode::ManageStatus() - Error on Ping: %s\n", errorMessage.c_str());
     }
 }
 
