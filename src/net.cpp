@@ -2802,6 +2802,13 @@ void ThreadSocketHandler()
 
     }
 
+    /* End of while, check if we are closing */
+    if ( fRequestShutdown )
+    {
+       printf("\n Bank Society Gold, Net Process ending...");
+       MilliSleep(10000);
+    }
+
     // Refresh nodes/peers every X minutes
     RefreshRecentConnections(2);
 
@@ -3353,8 +3360,10 @@ void static StartSync(const vector<CNode*> &vNodes)
 void ThreadMessageHandler()
 {
 extern volatile bool fRequestShutdown;
+int64_t Time_to_Last_block;
 
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
+LogPrintf("RGP NET ThreadMessageHandler start \n" );
 
     while ( !fRequestShutdown )
     {
@@ -3389,6 +3398,7 @@ extern volatile bool fRequestShutdown;
         {
             if (pnode->fDisconnect)
             {
+LogPrintf("RGP NET ThreadMessageHandler disconnected %s \n", pnode->addrName );
                 MilliSleep(5); /* RGP Optimisation */
                 continue;
             }
@@ -3396,7 +3406,27 @@ extern volatile bool fRequestShutdown;
 
             if ( pnode->vRecvMsg.empty() )
             {
-                /* do nothing */
+
+                // The only occasion that this could happen in when the Daemon
+                // is at the top of the chain or there is a network issue
+
+                Time_to_Last_block = GetTime() - pindexBest->GetBlockTime();
+                // LogPrintf("RGP NET ThreadMessageHandler Last block was %d \n", Time_to_Last_block );
+                if ( Time_to_Last_block < 4000 )
+                {
+                    // RGP, we are close to synch or are synched
+                    MilliSleep(50 );
+                }
+                else
+                {
+                    // This is the scenario where there is no messages, as the nodes 
+                    // have stopped sending messages.
+                    //LogPrintf("RGP NET ThreadMessageHandler no messages %s \n", pnode->addrName );
+                    PushGetBlocks(pnode, pindexBest, uint256(0) );
+                    MilliSleep(100 );
+                    StartSync(vNodesCopy);
+                    /* do nothing */
+                }
             }
             else
             {
@@ -3452,6 +3482,8 @@ extern volatile bool fRequestShutdown;
                 //}
             }
             //boost::this_thread::interruption_point();
+
+            MilliSleep( 20 );
         }
 
         {

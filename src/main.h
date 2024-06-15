@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Copyright (c) 2018 Profit Hunters Coin developers
-// Copyright (c) 2019 BankS SocietyG Coin developers (RGP)
+// Copyright (c) 2024 BankS Society Gold Coin developers (RGP)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_MAIN_H
@@ -35,6 +35,7 @@ static const int64_t TARGET_SPACING = 4 * 60; //240 sec
 #define INSTANTX_SIGNATURES_TOTAL              15
 
 #define MASTERNODE_COLLATERAL                  150000    /* SocietyG Coin Masternode Collateral */
+#define SUPERNODE_COLLATERAl                   2000000
 #define WALLET_STAKE_COLLATERAL                7500      /* Society Gold minimum stake amount   */
 
 class CBlock;
@@ -50,7 +51,7 @@ class CWallet;
 //    size_t operator()(const uint256& hash) const { return hash.GetLow64(); }
 //};
 typedef map<uint256, CBlockIndex*> BlockMap;
-extern BlockMap mapBlockIndex;
+extern BlockMap mapBlockIndexmice;
 
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
 static const unsigned int MAX_BLOCK_SIZE = 30000000;  //30MB
@@ -75,7 +76,7 @@ static const int64_t MIN_TX_FEE = 1000;
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying) */
 static const int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 /** No amount larger than this (in satoshi) is valid */
-static const int64_t MAX_MONEY = 150000000 * COIN;  // 150M COIN
+static const int64_t MAX_MONEY = 450000000 * COIN;  // 150M COIN
 
 inline bool MoneyRange(int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 /** Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp. */
@@ -394,19 +395,20 @@ public:
 
     //CAutoFile(FILE* filenew, int nTypeIn, int nVersionIn)
 
+
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
-        //LogPrintf("RG ReadFromDisk entry %d file pos \n", pos.nBlockPos );
+        
         //RGP : Found an error every 15 seconds when called from ConnectBlock to FetchInputs
         //      This issue needs investigating later...
         //      I am guessu=ing that the read is at the end of the file?
         
         CAutoFile filein = CAutoFile(  OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
- 
         if (filein.IsNull())
         {
-
-            return error("CTransaction::ReadFromDisk() : OpenBlockFile failed");
+	     // RGP Needs investigating later, it does not cause any issues.
+            //return error("CTransaction::ReadFromDisk() : OpenBlockFile failed");
+            return false;
         }
         // Read transaction
         if (fseek(filein.Get(), pos.nTxPos, SEEK_SET) != 0)
@@ -432,29 +434,6 @@ public:
         
         return true;
     }
-
-// MYCE Open history file to read
-//    CAutoFile filein(OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
-//    if (filein.IsNull())
-//        return error("CBlockUndo::ReadFromDisk : OpenBlockFile failed");
-//    // Read block
-//    uint256 hashChecksum;
-//    try {
-//        filein >> *this;
-//        filein >> hashChecksum;
-//    } catch (std::exception& e) {
-//        return error("%s : Deserialize or I/O error - %s", __func__, e.what());
-//    }
-//    // Verify checksum
-//    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
-//    hasher << hashBlock;
-//    hasher << *this;
-//    if (hashChecksum != hasher.GetHash())
-//        return error("CBlockUndo::ReadFromDisk : Checksum mismatch");
-//    return true;
-
-
-
 
     friend bool operator==(const CTransaction& a, const CTransaction& b)
     {

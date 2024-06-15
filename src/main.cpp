@@ -60,10 +60,16 @@ CCriticalSection cs_main;
 
 CTxMemPool mempool;
 
+// original 
+map<uint256, CBlockIndex*> mapBlockIndex;
+
 // from MYCE
-BlockMap mapBlockIndex;
+BlockMap mapBlockIndexmice;
 CChain chainActive;
 // from MYCE
+
+
+static int POS_Blocks_Stored = 0;
 
 //map<uint256, CBlockIndex*> mapBlockIndex;
 //map<uint256, CBlockIndex*> BlockMap;
@@ -388,11 +394,12 @@ uint256 randomhash;
 
 bool CTransaction::ReadFromDisk(CTxDB& txdb, const uint256& hash, CTxIndex& txindexRet)
 {
-//LogPrintf("RGP CTransaction::ReadFromDisk Entry 001 \n");
+LogPrintf("RGP CTransaction::ReadFromDisk Entry 001 %s HASH \n", hash.ToString() );
     SetNull();
+    
     if (!txdb.ReadTxIndex(hash, txindexRet))
     {
-
+        LogPrintf("RGP CTransaction::ReadFromDisk Entry 001 %s hash failed  \n", hash.ToString() );
         return false;
     }	
 	
@@ -406,11 +413,19 @@ bool CTransaction::ReadFromDisk(CTxDB& txdb, const uint256& hash, CTxIndex& txin
 
 bool CTransaction::ReadFromDisk(CTxDB& txdb, COutPoint prevout, CTxIndex& txindexRet)
 {
-//LogPrintf("RGP CTransaction::ReadFromDisk Entry 002 \n");
+LogPrintf("RGP CTransaction::ReadFromDisk Entry 002 %s previous hash \n", prevout.ToString() );
+
+//uint256 x = prevout.ToString()
+
     if (!ReadFromDisk(txdb, prevout.hash, txindexRet))
+    {
+        LogPrintf("RGP CTransaction::ReadFromDisk Entry 002 %s previous hash failed  \n", prevout.hash.ToString() );
+        LogPrintf("RGP CTransaction::ReadFromDisk Entry 002 %s previous hash \n", prevout.ToString() );
         return false;
+    }
     if (prevout.n >= vout.size())
     {
+        LogPrintf("compare error? \n");
         SetNull();
         return false;
     }
@@ -659,6 +674,8 @@ int CMerkleTx::SetMerkleBranch(const CBlock* pblock)
     if (pblock == NULL) {
         // Load the block this tx is in
         CTxIndex txindex;
+        
+LogPrintf("RGP CMerkleTx::SetMerkleBranch before ReadTxIndex \n");
         if (!CTxDB("r").ReadTxIndex(GetHash(), txindex))
             return 0;
         if (!blockTmp.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos)) {
@@ -1027,8 +1044,15 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
                          bool* pfMissingInputs, bool fRejectInsaneFee, bool isDSTX)
 {
     AssertLockHeld(cs_main);
+    
+    LogPrintf("RGP AssertableInputs() start \n" );
+    
     if (pfMissingInputs)
+    {
+    	LogPrintf("RGP AssertableInputs() Missing Inputs \n" );
         *pfMissingInputs = false;
+    }
+
 
     CTransaction tx(txo);
     string reason;
@@ -1046,17 +1070,23 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
 
     // is it already in the memory pool?
     uint256 hash = tx.GetHash();
+    LogPrintf("RGP AssertableInputs() hash %s \n", hash.ToString() );
+    
     if (pool.exists(hash))
         return false;
 
     // ----------- instantX transaction scanning -----------
 
-    BOOST_FOREACH(const CTxIn& in, tx.vin){
-        if(mapLockedInputs.count(in.prevout)){
-            if(mapLockedInputs[in.prevout] != tx.GetHash()){
+    BOOST_FOREACH(const CTxIn& in, tx.vin)
+    {
+        if(mapLockedInputs.count(in.prevout))
+        {
+            if(mapLockedInputs[in.prevout] != tx.GetHash())
+            {
                 return tx.DoS(0, error("AcceptableInputs : conflicts with existing transaction lock: %s", reason));
             }
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     // Check for conflicts with in-memory transactions
@@ -1070,6 +1100,7 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
             // Disable replacement feature for now
             return false;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
     }
 
@@ -1078,8 +1109,10 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
 
         // do we already have it?
         if (txdb.ContainsTx(hash))
+        {
+            LogPrintf("RGP AssertableInputs() Already have the hash? \n" );
             return false;
-
+	}
         MapPrevTx mapInputs;
         map<uint256, CTxIndex> mapUnused;
         bool fInvalid = false;
@@ -1284,29 +1317,25 @@ int GetInputAge(CTxIn& vin)
     CTransaction tx;
     uint256 hashBlock;
 
-    //LogPrintf("*** RGP GetInputAge Start \n ");
+    LogPrintf("*** RGP GetInputAge Start \n ");
 
     bool fFound = GetTransaction(prevHash, tx, hashBlock);
     if ( fFound )
     {
-        //LogPrintf("*** RGP GetInputAge Found \n ");
 
         if ( mapBlockIndex.find(hashBlock) != mapBlockIndex.end())
         {
-
-           //LogPrintf("*** RGP GetInputAge best height and index end are good  \n" );
 
            return pindexBest->nHeight - mapBlockIndex[hashBlock]->nHeight;
         }
         else
         {
-           //LogPrintf("*** RGP GetInputAge NOT Found blockindex mismatch \n ");
            return 0;
         }
     }
     else
     {
-        //LogPrintf("*** RGP GetInputAge NOT Found \n ");
+        LogPrintf("*** RGP GetInputAge NOT Found \n ");
         return 0;
     }
 }
@@ -1349,6 +1378,7 @@ int GetIXConfirmations(uint256 nTXHash)
 int CTxIndex::GetDepthInMainChain() const
 {
     // Read block header
+//LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 800 \n");
     CBlock block;
     if (!block.ReadFromDisk(pos.nFile, pos.nBlockPos, false))
         return 0;
@@ -1370,14 +1400,19 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
         {
             if (mempool.lookup(hash, tx))
             {
-                return true;
+                return true;        
             }
         }
         CTxDB txdb("r");
         CTxIndex txindex;
+        
+// LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 801 %d %s \n", txindex.pos.nBlockPos, hash.ToString() );        
+        
+        
         if (tx.ReadFromDisk(txdb, hash, txindex))
         {
             CBlock block;
+// LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 802 %d \n", txindex.pos.nBlockPos ); 
             if (block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
                 hashBlock = block.GetHash();
             return true;
@@ -1389,6 +1424,8 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
             if (pindex == pindexBest || pindex->pnext != 0)
                 continue;
             CBlock block;
+            MilliSleep(1);
+// LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 803 %d \n", txindex.pos.nBlockPos ); 
             if (!block.ReadFromDisk(pindex))
                 continue;
             BOOST_FOREACH(const CTransaction& txOrphan, block.vtx)
@@ -1398,7 +1435,9 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
                     tx = txOrphan;
                     return true;
                 }
+                MilliSleep(2);
             }
+            MilliSleep(1);
         }
     }
     return false;
@@ -1689,7 +1728,7 @@ int64_t GetProofOfWorkReward(int nHeight, int64_t nFees)
     MoneySupply = (double)pindexBest->nMoneySupply / (double)COIN;
     //LogPrintf("*** RGP PoW Moneysupply is string %f \n", MoneySupply  );
 
-    if ( MoneySupply > 75000000.0 )
+    if ( MoneySupply > 450000000.0 )
     {
         LogPrintf("MAXIMUM Money SupplyExceeded!!!\n");
         return 0;
@@ -1776,7 +1815,7 @@ int64_t GetProofOfStakeReward(const CBlockIndex* pindexPrev, int64_t nCoinAge, i
     /* ---------------------------------------------------------------------
      * -- RGP, 28th April 2023, Changed the Money Supply from 75M to 150M --
      * --------------------------------------------------------------------- */
-    if ( MoneySupply > 150000000.0 )
+    if ( MoneySupply > 450000000.0 )
     {
         LogPrintf("MAXIMUM MoneySupply Exceeded!!!\n");
         return 0;
@@ -1948,7 +1987,7 @@ static CBlockIndex* pindexLastBest;
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
 {
-LogPrintf("RGP InvalidChainFound Debug 001 \n");
+LogPrintf("RGP InvalidChainFound Debug 001 %s \n", pindexNew->ToString() );
     if (pindexNew->nChainTrust > nBestInvalidTrust)
     {
 LogPrintf("RGP InvalidChainFound Debug 002 \n");
@@ -1969,6 +2008,10 @@ LogPrintf("RGP InvalidChainFound Debug 003 \n");
       CBigNum(pindexBest->nChainTrust).ToString(),
       nBestBlockTrust.Get64(),
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()));
+      
+      
+      
+      
 }
 
 
@@ -2002,24 +2045,64 @@ bool CTransaction::DisconnectInputs(CTxDB& txdb)
     // Relinquish previous transactions' spent pointers
     if (!IsCoinBase())
     {
+    
+    LogPrintf("RGP CTransaction::DisconnectInputs \n");
+        //
+        // class CTxDB access to LevelDB, where the blockchain is managed. (folder in .Society/txleveldb)
+        // class CTxIn is of class CTxIn, where 'prevout' is a class variable of type CoutPoint
+        // CoutPoint is a class COutPoint in core.h
+        // class CTransaction
+        //    std::vector<CTxIn> vin;
+        //    std::vector<CTxOut> vout;
+        //    class COutPoint defines prevout (previous block hash )
+        //
+        // class CTxIn is 
+        //
+        //   COutPoint prevout;
+        //   CScript scriptSig;
+        //   CScript prevPubKey;
+        //   unsigned int nSequence;
+        
+        
         BOOST_FOREACH(const CTxIn& txin, vin)
         {
+        
+            // RGP, txin holds the previous transaction     
+              
+LogPrintf("RGP CTransaction::DisconnectInputs %s Previous transaction hash \n", txin.prevout.hash.ToString());       
+            if ( txin.prevout.hash.ToString() == "9038f84cbd49013aaa328941238659be8d4e2ee8f19e056a5471ce83dbfb3249" )
+            {
+               // This one of the bad blocks caused at block 575697 ignore it
+               continue;
+            }
             COutPoint prevout = txin.prevout;
 
-            // Get prev txindex from disk
+            // Get prev txindex from disk, read using the hash txin.previous.hash
             CTxIndex txindex;
             if (!txdb.ReadTxIndex(prevout.hash, txindex))
-                return error("DisconnectInputs() : ReadTxIndex failed");
+            {
+LogPrintf("RGP DisconnectInputs prevout.hash %s \n \n", prevout.hash.ToString() );
+            	// RGP removing the error() call as it affects MN processing
+                // return error("DisconnectInputs() : ReadTxIndex failed");
+                LogPrintf("DisconnectInputs() : ReadTxIndex failed\n");
+                
+                // If this entry is not read from the data stream, let's try to delete
+                
+                
+                //return false;
+	    }
+	    else
+	    {
+            	if (prevout.n >= txindex.vSpent.size())
+               	 return error("DisconnectInputs() : prevout.n out of range");
 
-            if (prevout.n >= txindex.vSpent.size())
-                return error("DisconnectInputs() : prevout.n out of range");
+            	// Mark outpoint as not spent
+            	txindex.vSpent[prevout.n].SetNull();
 
-            // Mark outpoint as not spent
-            txindex.vSpent[prevout.n].SetNull();
-
-            // Write back
-            if (!txdb.UpdateTxIndex(prevout.hash, txindex))
-                return error("DisconnectInputs() : UpdateTxIndex failed");
+            	// Write back
+            	if (!txdb.UpdateTxIndex(prevout.hash, txindex))
+               	 return error("DisconnectInputs() : UpdateTxIndex failed");
+	    }
         }
     }
 
@@ -2042,12 +2125,13 @@ bool CTransaction::FetchInputs(CTxDB& txdb, const map<uint256, CTxIndex>& mapTes
     // be dropped).  If tx is definitely invalid, fInvalid will be set to true.
     fInvalid = false;
     
-//LogPrintf("RGP FetchInputs Debug 001 \n");
-MilliSleep(1);
+    MilliSleep(1); /* RGP Optimise */
 
     if (IsCoinBase())
+    {
         return true; // Coinbase transactions have no inputs to fetch.
-
+    }
+    
     for (unsigned int i = 0; i < vin.size(); i++)
     {
         COutPoint prevout = vin[i].prevout;
@@ -2077,31 +2161,44 @@ MilliSleep(1);
             return fMiner ? false : fInvalid = false;
         }
 
-//LogPrintf("RGP FetchInputs Debug 010 \n");
-MilliSleep(1);
+
+        MilliSleep(1); /* RGP Optimise */
+        
         // Read txPrev
         CTransaction& txPrev = inputsRet[prevout.hash].second;
+ 
         if (!fFound || txindex.pos == CDiskTxPos(1,1,1))
         {
+
             // Get prev tx from single transactions in memory
             if (!mempool.lookup(prevout.hash, txPrev))
                 return error("FetchInputs() : %s mempool Tx prev not found %s", GetHash().ToString(),  prevout.hash.ToString());
             if (!fFound)
                 txindex.vSpent.resize(txPrev.vout.size());
+
         }
         else
         {
+
             // Get prev tx from disk
-            if (!txPrev.ReadFromDisk(txindex.pos))
+            if ( txindex.pos.nBlockPos == 0 )
             {
-               //LogPrintf("RGP failed to read previous transaction from disk \n");
+               // Do nothing
+               
                return false;
-               //return error("FetchInputs() : %s ReadFromDisk prev tx %s failed", GetHash().ToString(),  prevout.hash.ToString());
+            }   
+            else   
+            {
+		if (!txPrev.ReadFromDisk(txindex.pos))
+               {
+                   LogPrintf("RGP failed to read previous transaction from disk \n");
+                   return false;
+                   //return error("FetchInputs() : %s ReadFromDisk prev tx %s failed", GetHash().ToString(),  prevout.hash.ToString());
+               }
             }
         }
-        
-//LogPrintf("RGP FetchInputs Debug 020 \n");
-MilliSleep(1);
+
+	MilliSleep(1); /* RGP Optimise */
     }
 
     // Make sure all prevout.n indexes are valid:
@@ -2118,6 +2215,8 @@ MilliSleep(1);
             fInvalid = true;
             return DoS(100, error("FetchInputs() : %s prevout.n out of range %d %u %u prev tx %s\n%s", GetHash().ToString(), prevout.n, txPrev.vout.size(), txindex.vSpent.size(), prevout.hash.ToString(), txPrev.ToString()));
         }
+        
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return true;
@@ -2277,15 +2376,30 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs, map<uint256, CTx
 
 bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 {
+
+LogPrintf("RGP Debug DisconnectBlock pindex %s \n ", pindex->ToString() );
+
     // Disconnect in reverse order
+    
+LogPrintf("RGP DEBUG DisconnectBlock check of DisconnectInputs logic %d vtx size \n", vtx.size() );
     for (int i = vtx.size()-1; i >= 0; i--)
+    {
         if (!vtx[i].DisconnectInputs(txdb))
+        {
+LogPrintf("RGP Debug DisconnectBlock, DisconectInputs FAIL! \n");
             return false;
+	}
+	
+    }
+
+LogPrintf("RGP Debug DisconnectBlock pindex %s \n \n pindex->pprev %s \n \n", pindex->ToString(), pindex->pprev->ToString() );
 
     // Update block index on disk without changing it in memory.
     // The memory index structure will be changed after the db commits.
     if (pindex->pprev)
     {
+LogPrintf(" RGP Debug DisconnectBlock pindex->pprev is not zero \n");
+
         CDiskBlockIndex blockindexPrev(pindex->pprev);
         blockindexPrev.hashNext = 0;
         if (!txdb.WriteBlockIndex(blockindexPrev))
@@ -2416,7 +2530,6 @@ void CBlock::RebuildAddressIndex(CTxDB& txdb)
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
 
-//LogPrintf("RGP DEBUG ConnectBlock Start \n");
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(!fJustCheck, !fJustCheck, false))
     {
@@ -2466,11 +2579,10 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             nValueOut += tx.GetValueOut();
         else
         {
-//LogPrintf("RGP DEBUG ConnectBlock Debug 010 \n");        
+       
             bool fInvalid;
             if (!tx.FetchInputs(txdb, mapQueuedChanges, true, false, mapInputs, fInvalid))
             {
-//LogPrintf("RGP DEBUG ConnectBlock Debug 011 \n");
                 return false;
             }
 
@@ -2593,8 +2705,12 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                             {
                                 if(!txdb.WriteAddrIndex(addrId, hashTx))
                                     LogPrintf("ConnectBlock(): txins WriteAddrIndex failed addrId: %s txhash: %s\n", addrId.ToString().c_str(), hashTx.ToString().c_str());
+                                    
+                                MilliSleep( 5);
                             }
                         }
+                        
+                        MilliSleep(1);
                     }
                 }
             }
@@ -2639,6 +2755,8 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
     CBlockIndex* pfork = pindexBest;
     CBlockIndex* plonger = pindexNew;
 
+LogPrintf("RGP Debug Reorganize entry pindexBest %s \n pindexNew %s \n",  pindexBest->ToString() , pindexNew->ToString() );
+
     while (pfork != plonger)
     {
         while (plonger->nHeight > pfork->nHeight)
@@ -2659,8 +2777,13 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
     // List of what to disconnect
     vector<CBlockIndex*> vDisconnect;
     for (CBlockIndex* pindex = pindexBest; pindex != pfork; pindex = pindex->pprev)
+    {
+        LogPrintf("RGP Debug Reorganize list of what to disconnect pindex %s \n",  pindex->ToString() );
         vDisconnect.push_back(pindex);
-
+    }
+    
+    LogPrintf("RGP debug Reorganize count of vDisconnect %d \n", vDisconnect.size() );
+    
     // List of what to connect
     vector<CBlockIndex*> vConnect;
     for (CBlockIndex* pindex = pindexNew; pindex != pfork; pindex = pindex->pprev)
@@ -2672,16 +2795,26 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
         LogPrintf("REORGANIZE: Connect %u blocks; %s..%s\n", vConnect.size(), pfork->GetBlockHash().ToString(), pindexNew->GetBlockHash().ToString());
     }
 
+    LogPrintf("RGP debug DisconnectBlock count of vConnect %d \n", vConnect.size() );
+
     // Disconnect shorter branch
     list<CTransaction> vResurrect;
     BOOST_FOREACH(CBlockIndex* pindex, vDisconnect)
     {
         CBlock block;
         if (!block.ReadFromDisk(pindex))
-            return error("Reorganize() : ReadFromDisk for disconnect failed");
+            return error("Reorganize() : ReadFromDisk for disconnect failed"); 
+            
+        // 
+        // RGP note that the failure in the MN fails in DisconnectBlock \n);
+        //
         if (!block.DisconnectBlock(txdb, pindex))
-            return error("Reorganize() : DisconnectBlock %s failed", pindex->GetBlockHash().ToString());
-
+        {
+            // RGP removed, affecting Master Node
+            // return error("Reorganize() : DisconnectBlock %s failed", pindex->GetBlockHash().ToString());
+            LogPrintf("Reorganize() : DisconnectBlock %s failed\n", pindex->GetBlockHash().ToString());
+            return false;
+	}   
         // Queue memory transactions to resurrect.
         // We only do this for blocks after the last checkpoint (reorganisation before that
         // point should only happen with -reindex/-loadblock, or a misbehaving peer.
@@ -2689,6 +2822,8 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
             if (!(tx.IsCoinBase() || tx.IsCoinStake()) && pindex->nHeight > Checkpoints::GetTotalBlocksEstimate())
                 vResurrect.push_front(tx);
     }
+
+LogPrintf("RGP CTxIndex::GetDepthInMainChain before ReadFromDisk Debug 805 \n"); 
 
     // Connect longer branch
     vector<CTransaction> vDelete;
@@ -2748,33 +2883,32 @@ bool CBlock::SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew)
        -- RGP Found that a combined ConnectBlock and WriteBest Hash caused --
        -- a system read file IO fatal error, split the logic, it does not  --
        -- create the file IO error?                                        --
+       -- THIS CAUSED AN ERROR STOPPING AND RESTARTING, REMOVE THIS FIX    --
        ---------------------------------------------------------------------- */
     MilliSleep(1); /* RGP Optimize */
     
     // Adding to current best branch
-    //if (!ConnectBlock(txdb, pindexNew) || !txdb.WriteHashBestChain(hash))
-    if (!ConnectBlock(txdb, pindexNew) )
+    if(!ConnectBlock(txdb, pindexNew) || !txdb.WriteHashBestChain(hash))
     {
-//LogPrintf("*** RGP SetBestChainInner Debug 002 \n");
-MilliSleep(1);
+
         if ( !txdb.WriteHashBestChain(hash) )
         {
-//LogPrintf("*** RGP SetBestChainInner Debug 003 \n");
-MilliSleep(1);
+
+           MilliSleep(5);
            txdb.TxnAbort();
            LogPrintf("*** RGP SetBestChainInner Debug 004 \n");
            InvalidChainFound(pindexNew);
 
            return false;
         }
-//LogPrintf("*** RGP SetBestChainInner Debug 005 OK \n");
+
         MilliSleep(1);
     }
     
     
     if (!txdb.TxnCommit())
     {
-        return error("SetBestChain() : TxnCommit failed");
+        return error("SetBestChainInner() : TxnCommit failed");
     }
 
     // Add to current best branch
@@ -2782,10 +2916,18 @@ MilliSleep(1);
 
     // Delete redundant memory transactions
     BOOST_FOREACH(CTransaction& tx, vtx)
+    {
         mempool.remove(tx);
+        MilliSleep(1);
+    }
 
     return true;
 }
+
+/* -----------------------------------------------------------------
+   -- SetBestChain --                                             --
+   ----------------------------------------------------------------- */
+
 
 bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 {
@@ -2793,14 +2935,29 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 
 MilliSleep(1);
 
+    // LogPrintf("RGP Debug SetBestChain pindexnew %s \n", pindexNew->ToString() );
+
+    if (hashPrevBlock != hashBestChain)
+    {
+       /* ----------------------------------------------------------------------------------------------
+          -- RGP, this means that somehow the system has recorded an invalid  block in the blockchain --
+          --      Let's determine the last block in the chain and delete it.
+          --      We need what we have available here first
+          ---------------------------------------------------------------------------------------------- */
+      
+       printf("RGP SetBestChain establish the invalid block, previous is \n %s \n Best Chain is %s \n", hashPrevBlock.ToString() , hashBestChain.ToString() );
+
+       return false; /* error("SetBestChain() : Invalid Block\n") */
+    }
+
+
     if (!txdb.TxnBegin())
         return error("SetBestChain() : TxnBegin failed");
 
-MilliSleep(1);
+    MilliSleep(1);
+
     if (pindexGenesisBlock == NULL && hash == Params().HashGenesisBlock())
     { 
-
-MilliSleep(5);
         txdb.WriteHashBestChain(hash);
 
         if (!txdb.TxnCommit())
@@ -2813,53 +2970,67 @@ MilliSleep(5);
     }
     else if (hashPrevBlock == hashBestChain)
     {
-
-MilliSleep(5);
         if (!SetBestChainInner(txdb, pindexNew))
         {
-
             return error("SetBestChain() : SetBestChainInner failed");
         }
     }
     else
     {
-
-MilliSleep(5);
+        MilliSleep(1);
 
         // the first block in the new chain that will cause it to become the new best chain
         CBlockIndex *pindexIntermediate = pindexNew;
 
         // list of blocks that need to be connected afterwards
+        //
+        // RGP check CBlockIndex* to see if this is ever more than one block?
+        //
         std::vector<CBlockIndex*> vpindexSecondary;
+
+	//LogPrintf("SetBestChain %d vpindexSecondary \n", vpindexSecondary.size() );
 
         // Reorganize is costly in terms of db load, as it works in a single db transaction.
         // Try to limit how much needs to be done inside
+        
         while (pindexIntermediate->pprev && pindexIntermediate->pprev->nChainTrust > pindexBest->nChainTrust)
         {
-            vpindexSecondary.push_back(pindexIntermediate);
-            pindexIntermediate = pindexIntermediate->pprev;
-
-            MilliSleep(1); /* RGP Optimize */
+            if ( pindexIntermediate->ToString() == "5d7c9f594c3cd222e59ea68e902a60e66941f7aa0e72d44bb8bb2758971f9a41" )
+            {
+               // no Pushback
+               MilliSleep(1);
+            }
+            else
+            {
+               vpindexSecondary.push_back(pindexIntermediate);
+               pindexIntermediate = pindexIntermediate->pprev;
+//LogPrintf("RGP DEBUG SetBest Chain pindexIntermediate LOOP %s pindexIntermediate->pprev->nChainTrust %s pindexBest->nChainTrust \n", pindexIntermediate->pprev->nChainTrust.ToString(), pindexBest->nChainTrust.ToString() );
+               MilliSleep(1); /* RGP Optimize */
+            
+            }
         }
 
-MilliSleep(5);
 
+        MilliSleep(5);
+        
+	//
+	// RGP now it checks the size of vpindexSecondary
+	//
         if (!vpindexSecondary.empty())
             LogPrintf("Postponing %u reconnects\n", vpindexSecondary.size());
             
-
-MilliSleep(5);
-
         // Switch to new best branch
         if (!Reorganize(txdb, pindexIntermediate))
         {
             txdb.TxnAbort();
             InvalidChainFound(pindexNew);
-            return error("SetBestChain() : Reorganize failed");
+            // RGP, disabled the error() call as it's causing the MN to lose messages and fall behind the block
+            // return error("SetBestChain() : Reorganize failed");
+            LogPrintf("SetBestChain() : Reorganize failed \n");
+            return false;
         }
         
-//LogPrintf("*** RGP SetBestChain Debug 040 \n");
-MilliSleep(5);
+        MilliSleep(1);
 
         // Connect further blocks
         BOOST_REVERSE_FOREACH(CBlockIndex *pindex, vpindexSecondary)
@@ -2881,24 +3052,21 @@ MilliSleep(5);
             // errors now are not fatal, we still did a reorganisation to a new chain in a valid way
             if (!block.SetBestChainInner(txdb, pindex))
                 break;
+            
+            MilliSleep(1);
         }
     }
     
-//LogPrintf("*** RGP SetBestChain Debug 080 \n");
-MilliSleep(5);
-
     // Update best block in wallet (so we can detect restored wallets)
     bool fIsInitialDownload = IsInitialBlockDownload();
-//LogPrintf("*** RGP SetBestChain Debug 081 \n");
     if ((pindexNew->nHeight % 20160) == 0 || (!fIsInitialDownload && (pindexNew->nHeight % 144) == 0))
     {
-//LogPrintf("*** RGP SetBestChain Debug 082 \n");
         const CBlockLocator locator(pindexNew);
         g_signals.SetBestChain(locator);
     }
 
-MilliSleep(1);
-//LogPrintf("*** RGP SetBestChain Debug 085 \n");
+    MilliSleep(1);
+
     // New best block
     hashBestChain = hash;
     pindexBest = pindexNew;
@@ -2907,21 +3075,21 @@ MilliSleep(1);
     nBestChainTrust = pindexNew->nChainTrust;
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
-//LogPrintf("*** RGP SetBestChain Debug 086 \n");
+
     uint256 nBestBlockTrust = pindexBest->nHeight != 0 ? (pindexBest->nChainTrust - pindexBest->pprev->nChainTrust) : pindexBest->nChainTrust;
     
-MilliSleep(1);
-//LogPrintf("*** RGP SetBestChain Debug 087 \n");
-    if (fDebug ){
+    MilliSleep(1);
+
+    if (fDebug )
+    {
         LogPrintf("SetBestChain: new best=%s  height=%d  trust=%s  blocktrust=%d  date=%s\n",
-      hashBestChain.ToString(), nBestHeight,
-      CBigNum(nBestChainTrust).ToString(),
-      nBestBlockTrust.Get64(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()));
+        hashBestChain.ToString(), nBestHeight,
+        CBigNum(nBestChainTrust).ToString(),
+        nBestBlockTrust.Get64(),
+        DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()));
     }
     // Check the version of the last 100 blocks to see if we need to upgrade:
    
-//LogPrintf("*** RGP SetBestChain Debug 088 \n");    
     if (!fIsInitialDownload)
     {
         int nUpgraded = 0;
@@ -2941,20 +3109,16 @@ MilliSleep(1);
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
     }
-//LogPrintf("*** RGP SetBestChain Debug 090 \n");
-MilliSleep(1);
 
     std::string strCmd = GetArg("-blocknotify", "");
 
     if (!fIsInitialDownload && !strCmd.empty())
-    {
-//LogPrintf("*** RGP SetBestChain Debug 095 \n");    	
-    
+    {    
         boost::replace_all(strCmd, "%s", hashBestChain.GetHex());
         boost::thread t(runCommand, strCmd); // thread runs free
     }
-//LogPrintf("*** RGP SetBestChain Debug 100 \n");
-MilliSleep(1);
+    
+    MilliSleep(1);
 
     return true;
 }
@@ -2970,6 +3134,8 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, const CBlockIndex* pindexPrev, uint64
 {
     CBigNum bnCentSecond = 0;  // coin age in the unit of cent-seconds
     nCoinAge = 0;
+
+LogPrintf("*** RGP CTransaction::GetCoinAge Debug 810 \n");
 
     if (IsCoinBase())
         return true;
@@ -3011,6 +3177,26 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const u
     uint256 hash = GetHash();
     if (mapBlockIndex.count(hash))
         return error("AddToBlockIndex() : %s already exists", hash.ToString());
+        
+    if ( hashPrevBlock != hashBestChain )
+    {
+
+        LogPrintf("RGP AcceptBlock AddToBlockIndex invalid block \n" );
+        LogPrintf("RGP current Hash is %s \n", hash.ToString() );    // Possible duplicate block?
+        LogPrintf("RGP hashPrevBlock is %s \n", hashPrevBlock.ToString() );
+        LogPrintf("RGP hashBestChain is %s Height is %d \n \n \n", hashBestChain.ToString(), GetHeight() );
+
+        LogPrintf("RGP AddToBlockIndex establish the invalid block, Position is %d Best Chain is %s \n", nBlockPos , hashProof.ToString() );
+
+        /* Get the current blocks next hash block */
+
+        PushGetBlocks(From_Node, pindexBest, uint256(0) );
+        
+        MilliSleep(5);
+   
+        return error("AddtoBlockIndex() : Invalid Block\n");
+    }        
+
 
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *this);
@@ -3040,7 +3226,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const u
     bool fGeneratedStakeModifier = false;
     if (!ComputeNextStakeModifier(pindexNew->pprev, nStakeModifier, fGeneratedStakeModifier))
         return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
+        
     pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
+    
+    MilliSleep(1);
     
     // Add to mapBlockIndex
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
@@ -3048,27 +3237,40 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const u
         setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
     pindexNew->phashBlock = &((*mi).first);
 
+    MilliSleep(2);
+
+
     // Write to disk block index
     CTxDB txdb;
     if (!txdb.TxnBegin())
+    {
+        LogPrintf("RGP AddToBlockIndex txdb Begin FAILED \n" );
+
         return false;
+    }
+    
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
     if (!txdb.TxnCommit())
-        return false;
+    {
+        LogPrintf("RGP AddToBlockIndex TxnCommit failed \n" );
 
-MilliSleep(1);
+        return false;
+    }
+
+    MilliSleep(1);
 
     // New best
     if (pindexNew->nChainTrust > nBestChainTrust)
     {
 
-        if (!SetBestChain(txdb, pindexNew))
+        if ( !SetBestChain(txdb, pindexNew) )
         {
+            LogPrintf("RGP AddToBlockIndex SetBestChain Debug 020 FAILED!!! \n" );
+
             return false;
         }
     }
     
-MilliSleep(5);
     
     if (pindexNew == pindexBest)
     {
@@ -3079,8 +3281,10 @@ MilliSleep(5);
         
         hashPrevBestCoinBase = vtx[0].GetHash();
     }
+    else
+        LogPrintf("RGP AddToBlockIndex failed last check \n");
 
-MilliSleep(1);
+    MilliSleep(1);
 
     return true;
 }
@@ -3197,7 +3401,9 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
                         foundPayee = true; //doesn't require a specific payee
                         foundPaymentAmount = true;
                         foundPaymentAndPayee = true;
-                        if(fDebug) { LogPrintf("CheckBlock() : Using non-specific masternode payments %d\n", pindexBest->nHeight+1); }
+                        //if(fDebug) { 
+                        LogPrintf("CheckBlock() : Using non-specific masternode payments %d\n", pindexBest->nHeight+1); 
+                        //}
                     }
 
                     for (unsigned int i = 0; i < vtx[1].vout.size(); i++)
@@ -3216,23 +3422,25 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
 
                     if(!foundPaymentAndPayee)
                     {
-                        if(fDebug) { LogPrintf("CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1); }
+                        //if(fDebug) { 
+                        LogPrintf("CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1); 
+                        //}
                         return DoS(100, error("CheckBlock() : Couldn't find masternode payment or payee"));
                     }
                     else
                     {
-                        if (fDebug)
-                        {
+                        //if (fDebug)
+                        //{
                            LogPrintf("CheckBlock() : Found payment(%d|%d) or payee(%d|%s) nHeight %d. \n", foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1);
-                        }
+                        //}
                     }
                 }
                 else
                 {
-                    if(fDebug)
-                    {
+                    //if(fDebug)
+                    //{
                         LogPrintf("CheckBlock() : Skipping masternode payment check - nHeight %d Hash %s\n", pindexBest->nHeight+1, GetHash().ToString().c_str());
-                    }
+                    //}
                 }
             }
             else
@@ -3245,12 +3453,16 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         }
         else
         {
-            if(fDebug) { LogPrintf("CheckBlock() : skipping masternode payment checks\n"); }
+            //if(fDebug) { 
+            LogPrintf("CheckBlock() : skipping masternode payment checks\n");
+            // }
         }
     }
     else
     {
-        if(fDebug) { LogPrintf("CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1); }
+        if(fDebug) { 
+        LogPrintf("CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1); 
+        }
     }
 
 
@@ -3305,52 +3517,136 @@ bool CBlock::AcceptBlock()
 extern bool BSC_Wallet_Synching;
 extern CInv Inventory_to_Request;
 extern CNode *From_Node;
-uint256 hash;
+uint256 hash, current_previous_hash, previous_hash; 
+int display_filter = 0;
+int Top_entry, bad_entry;
+int bad_block_flag;
+int bad_block_hash_index;
+uint256 bad_block_hash_list[100];
+uint256 testhash;
+uint256* pHash_pointer;
+CBlockIndex *check_index;
+uint256 current_block;
+uint256 current_best_index_hash;
+
 
     AssertLockHeld(cs_main);
 
-    // Remove for BIP-0034 FORK
-    if (nVersion > CURRENT_VERSION)
+    //LogPrintf("RGP ACCEPTBLOCK() START \n");
+
+    /* ---------------------------------------------------------------------------------------
+       -- RGP, Added to ensure previous versions running do not send blocks to be accepted. -- 
+       --------------------------------------------------------------------------------------- */
+    //LogPrintf("AcceptBlock() check for bad wallet version \n");
+    if (nVersion < CURRENT_VERSION || nVersion > CURRENT_VERSION )
+    {
+    	LogPrintf("RGP \n version bad %d \n", nVersion );
         return DoS(100, error("AcceptBlock() : reject unknown block version %d", nVersion));
-
+    }
+    
     // Check for duplicate
-    hash = GetHash();
+    /* ---------------------------------------------------------------------- 
+       -- RGP, check for duplicate blocks that have already been processes --
+       --      and are in the block chain.                                 --
+       ---------------------------------------------------------------------- */
+    hash = GetHash(); // current new block hash
+    current_previous_hash = hashPrevBlock; // current new block previous hash
+    uint256 hash_to_request;
 
-//LogPrintf("AcceptBlock start debug 001 \n");
 MilliSleep(5);
 
+    //
+    // RGP, Build a list of this hash in the blockchain, it exists or does not 
+    //      if it already exists then exit, as it's a duplicated block
+    //
     if (mapBlockIndex.count(hash))
     {
         /* We have the new block, try to get blocks from pindexbest */        
         PushGetBlocks(From_Node, pindexBest, pindexBest->GetBlockHash() ); /* ask for again from best block */
-        MilliSleep( 1 );
+        PushGetBlocks(From_Node, pindexBest, uint256(0) ); /* ask for again from best block, starting from Pindexbest */
+        MilliSleep( 5 );
 
-        LogPrintf("*** RGP Debug Accept() Block already in MapBlockIndex \n");
-
-        //return error("AcceptBlock() : block already in mapBlockIndex");
-        return false;
+        return error("AcceptBlock() : block already in mapBlockIndex");
+        //return false;
     }
     else
     {
-        // Get prev block index
+        //
+        // RGP : class CBlock has hashPrevBlock in the class for the current block
+        //       Check if the previous block hash exists for the new blocks previous block link.
+        //       if the previous block is not found, we did not receive the previous message yet, 
+        //       so request it from other nodes.
+        //
+        //       if the previous block is found, we can now process this new block.
+        //
+             
         map<uint256, CBlockIndex*>::iterator mi_second = mapBlockIndex.find(hashPrevBlock);
         if (mi_second == mapBlockIndex.end())
         {
-            /* The blockhash was not found in the local store, look for
+            /* The Previous hash was not found in the local store, look for
                the previous blockhash, if we do not have it, ask for it */
 
-            /* Creare and inventory request message, it will result in a block being returned */
-            Inventory_to_Request.type = MSG_BLOCK;
-            Inventory_to_Request.hash = hashPrevBlock;
-            From_Node->AskFor( Inventory_to_Request, false );
+            /* Create an inventory request message, it will result in a block being returned */
+            
+           if ( GetHeight() == 21189 )
+           {
+//           	hash_to_request = "958200e9d76d2057e8913bc5b0105aceb4d84567953e401e4e967b8c599c46cf";
+//           	LogPrintf("RGP hash to request %d \n", hash_to_request );
+//           	Inventory_to_Request.type = MSG_BLOCK;
+//           	Inventory_to_Request.hash = "958200e9d76d2057e8913bc5b0105aceb4d84567953e401e4e967b8c599c46cf";
+//           	From_Node->AskFor( Inventory_to_Request, true );
+//           	LogPrintf("RGP requested 958200e9d76d2057e8913bc5b0105aceb4d84567953e401e4e967b8c599c46cf \n ");
+	       }
+            
+ 
+            
+            //PushGetBlocks(From_Node, pindexBest, uint256(0) );
+            // From_Node->fDisconnect = true;
+            MilliSleep( 2 );
+	        LogPrintf("RGP Can't find previous block %s current has %s current %s ", hashPrevBlock.ToString(), hash.ToString(), hashBestChain.ToString() );
+	    
 
-            //LogPrintf("AcceptBlock() : prev block not found \n");
             return false;
         }
-    }
+        
+        
+    	/* Prevent the new possible next index from being 
+           created if the prev hash is not existing in the blockchain on disk */
+       
+       if ( hashPrevBlock == hashBestChain )
+	    {
+		/* True the hashPrevBlock exits, so we can add this new block */
+		LogPrintf("RGP current CANDIDATE Hash is %s \n", hash.ToString() );    
+		//LogPrintf("RGP CANDIDATE hashPrevBlock is %s \n", hashPrevBlock.ToString() );
+		//LogPrintf("RGP hashBestChain is %s Height is %d \n \n \n", hashBestChain.ToString(), GetHeight() );
+		MilliSleep(2);
+	    }       
+	    else
+	    {
+		    LogPrintf("RGP AcceptBlock() the Hashprev points to nothing in the blockchain \n");
+		    LogPrintf("RGP AcceptBlock establish the invalid block \n" );
+LogPrintf("RGP current Hash is %s \n", hash.ToString() );    // Possible duplicate block?
+LogPrintf("RGP hashPrevBlock is %s \n", hashPrevBlock.ToString() );
+LogPrintf("RGP hashBestChain is %s Height is %d \n \n \n", hashBestChain.ToString(), GetHeight() );
 
-//LogPrintf("AcceptBlock start debug 002 \n");
-MilliSleep(5);
+	
+    		/* Reject it as the previous block did not arrive yet */
+    		//PushGetBlocks(From_Node, pindexBest, hashBestChain );
+    		PushGetBlocks(From_Node, pindexBest, hashBestChain  );
+		
+    		/* RGP Experimental, was false  */
+    		Inventory_to_Request.type = MSG_BLOCK;
+           	Inventory_to_Request.hash = hash_to_request;
+            From_Node->AskFor( Inventory_to_Request, true );
+		
+		    return false;
+	    }
+ 
+  
+   }
+
+
+   MilliSleep(5);
 
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
     CBlockIndex* pindexPrev = (*mi).second;
@@ -3380,9 +3676,7 @@ MilliSleep(5);
         return false;
     }
 
-//LogPrintf("AcceptBlock start debug 020 \n");
-
-MilliSleep(5);
+    MilliSleep(2);
 
     if (IsProofOfStake() && nHeight < Params().POSStartBlock())
         return DoS(100, error("AcceptBlock() : reject proof-of-stake at height <= %d", nHeight));
@@ -3408,8 +3702,8 @@ MilliSleep(5);
 
     }
 
-//LogPrintf("AcceptBlock start debug 030 \n");
-MilliSleep(5);
+    MilliSleep(2);
+    
     // Check proof-of-work or proof-of-stake
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()) && hash != uint256("0x474619e0a58ec88c8e2516f8232064881750e87acac3a416d65b99bd61246968") && hash != uint256("0x4f3dd45d3de3737d60da46cff2d36df0002b97c505cdac6756d2d88561840b63") && hash != uint256("0x274996cec47b3f3e6cd48c8f0b39c32310dd7ddc8328ae37762be956b9031024"))
         return DoS(100, error("AcceptBlock() : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
@@ -3427,63 +3721,107 @@ MilliSleep(5);
         return false;
     }
 
-//LogPrintf("AcceptBlock start debug 040 \n");
-MilliSleep(1);
+    MilliSleep(1);
 
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, vtx)
+    {
         if (!IsFinalTx(tx, nHeight, GetBlockTime()))
             return DoS(10, error("AcceptBlock() : contains a non-final transaction"));
-//LogPrintf("AcceptBlock start debug 042 \n");
-MilliSleep(1);
+
+        MilliSleep(1);
+    }
+
 
     // Check that the block chain matches the known block chain up to a checkpoint
     if (!Checkpoints::CheckHardened(nHeight, hash))
         return DoS(100, error("AcceptBlock() : rejected by hardened checkpoint lock-in at %d", nHeight));
-//LogPrintf("AcceptBlock start debug 044 \n");
-MilliSleep(1);
+
+    MilliSleep(1);
 
     // Verify hash target and signature of coinstake tx
-    if (IsProofOfStake())
+    // ------------------------------------------------------------------------
+    // -- RGP 8th June 2024 --                                               --
+    // -----------------------                                               --
+    //                                                                       --
+    // Significant effort to update this algorithm, which was ignored in the --
+    // check to what the previous block is and if it is in fact a PoW or PoS --
+    // If the previous coin was a PoW and this block is PoS, then the last   --
+    // or previous block needs to be considered, as there may not be the     --
+    // same details available, such as more than two transactions for PoS.   --
+    //
+    // First PoS after a series of PoW :
+    //
+    // If PoS, We can check the vtx vector array to see what is there 
+    // and validate that it may be correct.
+    
+    
+    if ( IsProofOfStake() )
     {
-//LogPrintf("AcceptBlock start debug 048 POS \n");
-MilliSleep(1);
-        uint256 targetProofOfStake;
-        if (!CheckProofOfStake(pindexPrev, vtx[1], nBits, hashProof, targetProofOfStake))
+
+        int64_t Time_to_Last_block;
+        bool read_failed;
+        bool stakekernelhash;
+  
+
+        //LogPrintf("RGP IsProofOfStake current hash being processed %s \n",  hash.ToString() );
+        MilliSleep(2);
+
+       
+        
+        /* -- RGP, Find the previous block to determine PoW or PoS --
+           --      If Proof of work 
+           --
+           --      If Proof of Stake
+
+*/
+        map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+        
+        // RGP, Assuming (*mi).second is pprev entry of CBlockIndex, eg the previous block of hashPrevBlock
+        //      
+    	CBlockIndex* pindexPrev = (*mi).second;
+    	const uint256 yaboy = *pindexPrev->phashBlock;
+    	int nHeight = pindexPrev->nHeight+1;
+
+        /* Check previous block for PoS or PoW */
+        if ( pindexPrev->IsProofOfWork() )
         {
-
-            // LogPrintf("*** RGP AcceptBlock failed after check PoS %s \n" , GetHash().ToString()  );
-            //if ( !BSC_Wallet_Synching )
-            //{
-
-            /* Ask for missing blocks */
-            PushGetBlocks(From_Node, pindexBest, pindexBest->GetBlockHash() );
-
-            //LogPrintf(" RGP CheckProofofStake fix best block is %d \n ", pindexBest->nHeight );
-            //switch (pindexBest->nHeight )
-            //{
-            //    case 100800 : LogPrintf("*** RGP Fix for 100800 \n");
-            //                  break;
-            //
-            //    case 101055 : LogPrintf("*** RGP Fix for 101055 \n");
-            //                  break;
-            //    case 101056 : LogPrintf("*** RGP Fix for 101056 \n");
-            //                  break;
-
-            //    default : return error("AcceptBlock() : check proof-of-stake failed for block %s", hash.ToString());
-
-            //};
-
-            //}
+ 
+            MilliSleep(5);
         }
+        else
+        {
+         	
+    	    const CTransaction& tx1 = vtx[0];		// Transactions defined within the block, PoW has one PoS has two+
+    	    const CTransaction& tx2 = vtx[1];
+
+            if ( vtx.size() > 1 )
+            {
+                //LogPrintf("RGP Previous block Valid vtx size \n");
+                MilliSleep( 5 );
+            }
+            else
+            {
+                //LogPrintf("RGP Previous block INVALID vtx size %d \n", vtx.size());
+                MilliSleep( 5 );
+                return false;
+            }
+            uint256 targetProofOfStake;
+            //LogPrintf("Current hash to process > %s \n",  hash.ToString() );
+            MilliSleep( 5 );
+
+        }
+       
+       // LogPrintf("RGP AcceptBlock VerifySignature Success \n");
+       MilliSleep( 5 );
+ 
+        
     }
-//LogPrintf("AcceptBlock start debug 050 \n");
-MilliSleep(1);
 
     // Check that the block satisfies synchronized checkpoint
-    if (!Checkpoints::CheckSync(nHeight))
+    if (!Checkpoints::CheckSync(nHeight) )
         return error("AcceptBlock() : rejected by synchronized checkpoint");
-//LogPrintf("AcceptBlock start debug 051 \n");
+
     /* -------------------------
        -- RGP : JIRA 177 test --
        ------------------------- */
@@ -3499,7 +3837,7 @@ MilliSleep(1);
         !std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin()))
         return DoS(100, error("AcceptBlock() : block height mismatch in coinbase"));
         
-MilliSleep(1);
+    MilliSleep(1);
 
     // Write block to history file
     if (!CheckDiskSpace(::GetSerializeSize(*this, SER_DISK, CLIENT_VERSION)))
@@ -3517,27 +3855,32 @@ MilliSleep(1);
         return false;
     }
 
+    // LogPrintf("RGP current CANDIDATE Hash written to disk %s \n", hash.ToString() );    
     if (!WriteToDisk(nFile, nBlockPos))
         return error("AcceptBlock() : WriteToDisk failed");
 
-//LogPrintf("AcceptBlock start debug 998 \n");
-MilliSleep(1);
+    MilliSleep(5);
+
     if (!AddToBlockIndex(nFile, nBlockPos, hashProof))
     {
-        LogPrintf("*** RGP Acceptblock, Invalid block from wallet node %s \n", From_Node->addr.ToString());
-        return error("AcceptBlock() : AddToBlockIndex failed");
+       
+        LogPrintf("*** RGP Acceptblock, After AddToBlockIndex Invalid block from wallet node %s  block %d height %d \n", From_Node->addr.ToString(), nBlockPos,  nHeight );
+        // RGP removed error() call as it's upsetting the MN
+        //return error("AcceptBlock() : AddToBlockIndex failed");
+        LogPrintf("AcceptBlock() : AddToBlockIndex failed \n");
+        return false;
     }
-//LogPrintf("AcceptBlock start debug 999 \n");
-MilliSleep(1);
+
+    MilliSleep(1);
 
     // Relay inventory, but don't relay old inventory during initial block download
     int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
     
-//LogPrintf("AcceptBlock start debug 1000 \n");
-MilliSleep(1);
+    MilliSleep(1);
 
     if (hashBestChain == hash)
     {
+ 
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
         {
@@ -3552,9 +3895,12 @@ MilliSleep(1);
             {
                 pnode->nSyncHeight = nHeight;
             }
+            
+            MilliSleep( 1 );
         }
     }
 
+    MilliSleep(10);
 
     return true;
 }
@@ -3644,6 +3990,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
 {
 uint256 hash;
 uint256 hashPrev;
+extern volatile bool fRequestShutdown;
 extern bool BSC_Wallet_Synching;
 extern CNode *From_Node;
 int64_t Time_to_Last_block;
@@ -3655,16 +4002,13 @@ int filter = 0;
 
     PoS_Mining_Block = false;
     
-    if ( filter > 1000 )
+    if ( filter > 10 )
     {
     	filter = 0;
     	LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());
     }
-    else
-    {
-    	filter++;
-    	MilliSleep(1);
-    }
+    filter++;
+    MilliSleep(1);
     
     if ( pfrom == NULL )
     {
@@ -3677,12 +4021,13 @@ int filter = 0;
     }
 
     // Check for duplicates
+
     hash = pblock->GetHash();
     if (mapBlockIndex.count(hash))
     {
         //if ( fDebug )
         //{
-        //    LogPrintf("*** ProcessBlock Already have the newly provide block HASH \n");
+            //LogPrintf("*** ProcessBlock Already have the newly provide block HASH \n");
         //LogPrintf("^");
         //}
 
@@ -3690,14 +4035,12 @@ int filter = 0;
         return false;
     }
 
-    if (mapOrphanBlocks.count(hash))
+    MilliSleep(1);   
+    if ( fRequestShutdown )
     {
-        //if ( fDebug )
-        //{
-            LogPrintf("*** ProcessBlock Already have the newly provide block HASH, but within mapOrphanBlocks *** \n");
-        //}
-        MilliSleep(5);
-        //return error("ProcessBlock() : already have block (orphan) %s", hash.ToString());
+       LogPrintf("\n\nBank Society Gold, AcceptBlock processing, SHUTDOWN detected \n");
+       MilliSleep(10000);
+       return false;
     }
 
         From_Node = pfrom;
@@ -3745,33 +4088,39 @@ int filter = 0;
             PrintExceptionContinue(NULL, "AcceptBlock()");
         }
 
+        MilliSleep(5);
 
         if (!Accept_Status)
         {
-            // LogPrintf("*** RGP ProcessBlock failed from %s \n", pfrom->addr.ToString() );
+            LogPrintf("\n *** RGP ProcessBlock failed AcceptBlock() from %s \n", pfrom->addr.ToString() );
+
+            // Let's diisconnect the pfrom node to see if we can clear the issue
+	    //pfrom->fDisconnect = true; 
 
             /* Previous block is missing, let's ask for it. However, this will repeat
                backwords until it finds the correct block, could take a while         */
-            pfrom->AskFor(CInv(MSG_BLOCK, pblock->hashPrevBlock ),  true );
+            //PushGetBlocks(pfrom, pindexBest, uint256(0) ); 
+            //pfrom->AskFor(CInv(MSG_BLOCK, pblock->hashPrevBlock ),  true );
 
             MilliSleep( 5 );
 
             //if ( BSC_Wallet_Synching )
             //{
-                PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash() ); /* also ask for everything from current block height */
+              //  PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash() ); /* also ask for everything from current block height */
                 //PushGetBlocks(pfrom, pindexBest, pblock->hashPrevBlock );
             //}
-            return false; /* return false, as (ProcessMessage will then clear ask for list for this orphan */
+            //return false; /* return false, as (ProcessMessage will then clear ask for list for this orphan */
         }
         else
         {           
+	    //LogPrintf("RGP ProcessBlock Accept Status was SUCCESSFUL, no errors\n");
+            if ( !IsInitialBlockDownload() )
+            {
 
-            if(!IsInitialBlockDownload()){
-
-                if ( fDebug )
-                {
+                //if ( fDebug )
+                //{
                     LogPrintf("*** RGP ProcessBlock, Masternode payment section and no IsInialBlockDownload \n");
-                }
+                //}
 
                 CScript payee;
                 CTxIn vin;
@@ -3820,20 +4169,17 @@ int filter = 0;
                         }
                     }
                     else
+                    {
                         LogPrintf("*** RGP ProcessBlock not light mode, fell out 2 \n");
-
+                    }
+                    
                     masternodePayments.ProcessBlock(GetHeight()+10);
                 }
 
             }
 
-
-            if ( PoS_Mining_Block )
-            {
-                return true;
-            }
-        }
-
+            return true;
+    }
 
     // ppcoin: check proof-of-stake
     // Limited duplicity on stake: prevents block flood attack
@@ -3851,7 +4197,8 @@ int filter = 0;
                    /* -----------------------------------------------
                       -- Duplicity check on stake was satisfactory --
                       ----------------------------------------------- */
-                    //LogPrintf("*** RGP Duplicity check-> Look into this BlockTime %d Gettim %d \n", pindexBest->GetBlockTime(), GetTime() );
+                    LogPrintf("*** RGP Duplicity check-> Look into this BlockTime %d Gettim %d \n", pindexBest->GetBlockTime(), GetTime() );
+                    MilliSleep(1);
                 }
                 else
                 {
@@ -3864,10 +4211,12 @@ int filter = 0;
                        /* RGP, there can be 6 seconds between the current stored block and the
                                new block, this second test has been used to check that the
                                pindexBest block is always less than GetTime()                   */
+                       MilliSleep(1);
                    }
                    else
                    {
                       LogPrintf("*** RGP Duplicate proof of stake \n");
+                      MilliSleep(1);
                       return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for block %s", pblock->GetProofOfStake().first.ToString(), pblock->GetProofOfStake().second, hash.ToString());
                    }
 
@@ -3876,8 +4225,10 @@ int filter = 0;
         }
     }
 
-      //LogPrintf("*** RGP ProcessBlock, DEBUG Special 002 \n");
-
+    LogPrintf("*** RGP ProcessBlock, DEBUG Special 002 \n");
+    
+    MilliSleep(5);
+    
     if (pblock->hashPrevBlock != hashBestChain)
     {
 
@@ -3892,7 +4243,7 @@ int filter = 0;
                     MilliSleep(1); /* RGP Optimise */
                 }
 
-                      LogPrintf("*** RGP ProcessBlock, DEBUG Special 003 \n");
+                LogPrintf("*** RGP ProcessBlock, DEBUG Special 003 \n");
 
                 return error("ProcessBlock() : block with timestamp before last checkpoint");
             }
@@ -3903,7 +4254,7 @@ int filter = 0;
        LogPrintf("*** ProcessBlock hashprev is equal to hashBestChain \n");
     }
 
-          //LogPrintf("*** RGP ProcessBlock, DEBUG Special 004 \n");
+    //LogPrintf("*** RGP ProcessBlock, DEBUG Special 004 \n");
 
 
     // Block signature can be malleated in such a way that it increases block size up to maximum allowed by protocol
@@ -3915,11 +4266,10 @@ int filter = 0;
     // Preliminary checks
     if (!pblock->CheckBlock())
     {
-        LogPrintf("*** ProcessBlock CheckBlock failed! \n");
         return error("ProcessBlock() : CheckBlock FAILED");
     }
 
-          //LogPrintf("*** RGP ProcessBlock, DEBUG Special 005 \n");
+    LogPrintf("*** RGP ProcessBlock, DEBUG Special 005 \n");
 
     // RGP : This is the start of the Orphan SAGA, which is causing synch issues, as
     //       this part is slowing chain synchs drastically. Looks like synch has stopped
@@ -3927,7 +4277,8 @@ int filter = 0;
 
     Time_to_Last_block = GetTime() - pindexBest->GetBlockTime();
 
-    return true;
+    if ( pblock->IsProofOfWork() )
+        return true;
 
     // If we don't already have its previous block, shunt it off to holding area until we get it
     if (!mapBlockIndex.count( pblock->hashPrevBlock ) && !IsInitialBlockDownload()   )
@@ -3944,7 +4295,7 @@ int filter = 0;
         // Accept orphans as long as there is a node to request its parents from
         if (pfrom)
         {
-            //LogPrintf("*** RGP Shunt block debug 1 \n");
+            LogPrintf("*** RGP Shunt block debug 1 \n");
 
             // ppcoin: check proof-of-stake
             if (pblock->IsProofOfStake())
@@ -3973,17 +4324,22 @@ int filter = 0;
             pblock2->hashBlock = hash;
             pblock2->hashPrev = pblock->hashPrevBlock;
             pblock2->stake = pblock->GetProofOfStake();
+            
+            MilliSleep(1);
 
             mapOrphanBlocks.insert(make_pair(hash, pblock2));
             mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrev, pblock2));
 
             if ( pblock->IsProofOfStake() )
             {
-                 //LogPrintf("*** RGP ProcessBlock, PoS inserted orphan \n");
+                 LogPrintf("*** RGP ProcBlk, PoS insert orphan \n");
                  setStakeSeenOrphan.insert(pblock->GetProofOfStake());
             }
 
-            LogPrintf("*** RGP no Previous block asking for %s last filed block height %l \n", hash.ToString() , GetHeight() );
+
+	    MilliSleep(1);
+
+            LogPrintf("*** RGP no Prev block ask for %s last filed block hgt %l \n", hash.ToString() , GetHeight() );
 
             // Ask this guy to fill in what we're missing
             PushGetBlocks(pfrom, pindexBest, GetOrphanRoot(hash));
@@ -3993,55 +4349,66 @@ int filter = 0;
             //PushGetBlocks(pfrom, pindexBest, hash ); /* RGP GetOrphanRoot(hash)); */
             // ppcoin: getblocks may not obtain the ancestor block rejected
             // earlier by duplicate-stake check so we ask for it again directly
-            if (!IsInitialBlockDownload())
-            {
+            
+            // ALREADY CHECK THIS ABOVE, DELETE DECISION LATER
+            
+            //if (!IsInitialBlockDownload())
+            //{
                 pfrom->AskFor(CInv(MSG_BLOCK, WantedByOrphan( pblock2 ) ) );
 
                 /* RGP Optimised, add a call to get our current highest entry and next 500 */
                 MilliSleep(1);
 
                 PushGetBlocks(pfrom, pindexBest,  pblock2->hashPrev );
-            }
-            else
-            {
-               //  Initial Block download
-            }
+            //}
+  
         }
-        else
-        {
+//        else
+//        {
+//
+//            return true;
+//        }
 
-            return true;
-        }
-
-              LogPrintf("*** RGP ProcessBlock, DEBUG Special 010 \n");
 
     }
 
-          LogPrintf("*** RGP ProcessBlock, DEBUG Special 011 \n");
+    //LogPrintf("*** RGP ProcBlk, Special 011 \n");
 
-          return true;
+ //         return true;
+
+
+    if (Accept_Status)
+    {
+       LogPrintf("Accept_Status is true, exiting this message loop\n");
+       return true;
+    }
 
     /* RGP, Fast Synch Implementation, if AcceptBlock cannot
             find the previous block, then ask for it!!       */
     From_Node = pfrom;
-
+LogPrintf("RGP <<<<Abnormal>>> AcceptBlock call - Process Orphan blocks \n");
     // Store to disk
     if (!pblock->AcceptBlock())
     {
-        if ( fDebug )
-        {
-            LogPrintf("*** RGP AcceptBlock 2nd try NOT Success trying OrphanPrevius store! \n");
-        }
+        //if ( fDebug )
+        //{
+            LogPrintf("*** RGP AcceptBlock 2nd try NOT Success trying Orphan store! \n");
+        //}
 
         vector<uint256> vWorkQueue;
         vWorkQueue.push_back(hash);
         for (unsigned int i = 0; i < vWorkQueue.size(); i++)
         {
+          LogPrintf("Orphan Loop 1 \n");
           hashPrev = vWorkQueue[i];
-          for (multimap<uint256, COrphanBlock*>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
-                mi != mapOrphanBlocksByPrev.upper_bound(hashPrev);
-                 ++mi)
-           {
+          
+          
+          for (  multimap<uint256, COrphanBlock*>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
+                 mi != mapOrphanBlocksByPrev.upper_bound(hashPrev); ++mi)
+          
+          {
+                LogPrintf("RGP multimap loop \n");
+                
                 CBlock block;
                 {
                     CDataStream ss(mi->second->vchBlock, SER_DISK, CLIENT_VERSION);
@@ -4055,18 +4422,22 @@ int filter = 0;
                 }
                 else
                 {
-                    // LogPrintf("*** RGP  failed to accept block using Orphans \n" );
+                    LogPrintf("*** RGP  failed to accept block using Orphans \n" );
                     //LogPrintf("ProcessBlock() : AcceptBlock FAILED\n");
                     return false;
                 }
 
+		 MilliSleep(1);
+
                 mapOrphanBlocks.erase(mi->second->hashBlock);
                 setStakeSeenOrphan.erase(block.GetProofOfStake());
                 delete mi->second;
-            }
-            mapOrphanBlocksByPrev.erase(hashPrev);
+                
+                MilliSleep(1);
+          }
+          mapOrphanBlocksByPrev.erase(hashPrev);
 
-            MilliSleep(1);
+          MilliSleep(1);
 
         }
 
@@ -4075,8 +4446,6 @@ int filter = 0;
         return error("ProcessBlock() : AcceptBlock FAILED");
     }
 
-
-    LogPrintf("*** RGP AcceptBlock SUCCESS \n" );
 
     // Recursively process any orphan blocks that depended on this one
     vector<uint256> vWorkQueue;
@@ -4112,6 +4481,9 @@ int filter = 0;
             mapOrphanBlocks.erase(mi->second->hashBlock);
             setStakeSeenOrphan.erase(block.GetProofOfStake());
             delete mi->second;
+            
+            MilliSleep(1);
+            
         }
         mapOrphanBlocksByPrev.erase(hashPrev);
 
@@ -4169,10 +4541,10 @@ int filter = 0;
 
     }
 
-    //if ( fDebug )
-    //{
-    LogPrintf("ProcessBlock: ACCEPTED FINAL\n");
-    // }
+    if ( fDebug )
+    {
+       LogPrintf("ProcessBlock: ACCEPTED FINAL\n");
+    }
 
 
 
@@ -4775,9 +5147,11 @@ void static ProcessGetData(CNode* pfrom)
 
     LOCK(cs_main);
 
+//LogPrintf("RGP DEBUB ProcessGetData started \n");
+
     while (it != pfrom->vRecvGetData.end())
     {
-
+LogPrintf("^");
         // Don't bother if send buffer is too full to respond anyway
         if (pfrom->nSendSize >= SendBufferSize() )
         {
@@ -4793,7 +5167,7 @@ void static ProcessGetData(CNode* pfrom)
 
             if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
             {
-
+//LogPrintf("*** RGP ProcessGetData |n");
                 // Send block from disk
                 map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end())
@@ -4818,7 +5192,8 @@ void static ProcessGetData(CNode* pfrom)
             else if (inv.IsKnownType())
             {
 
-                if(fDebug) LogPrintf("ProcessGetData -- Starting \n");
+                if ( fDebug)
+                   LogPrintf("ProcessGetData -- Starting \n");
                 // Send stream from relay memory
                 bool pushed = false;
                 /*{
@@ -4894,10 +5269,10 @@ void static ProcessGetData(CNode* pfrom)
                         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                         ss.reserve(1000);
                         ss <<
-                            mapDarksendBroadcastTxes[inv.hash].tx <<
-                            mapDarksendBroadcastTxes[inv.hash].vin <<
-                            mapDarksendBroadcastTxes[inv.hash].vchSig <<
-                            mapDarksendBroadcastTxes[inv.hash].sigTime;
+                        mapDarksendBroadcastTxes[inv.hash].tx <<
+                        mapDarksendBroadcastTxes[inv.hash].vin <<
+                        mapDarksendBroadcastTxes[inv.hash].vchSig <<
+                        mapDarksendBroadcastTxes[inv.hash].sigTime;
 
                         pfrom->PushMessage("dstx", ss);
                         pushed = true;
@@ -4915,6 +5290,7 @@ void static ProcessGetData(CNode* pfrom)
             if (inv.type == MSG_BLOCK  || inv.type == MSG_FILTERED_BLOCK)
                 break;
         }
+        MilliSleep(2); /* RGP Optimise */
     }
 
     pfrom->vRecvGetData.erase(pfrom->vRecvGetData.begin(), it);
@@ -4961,28 +5337,23 @@ CInv Problem_Blocks_Inv;
     CTxDB txdb("r");    
 
 
-    //LogPrintf("\nProcessMessage START \n");
-
-    if ( message_ask_filter > 50 )
+    if ( message_ask_filter > 1000 )
     {
-
+LogPrintf("rgp Processmessage started \n");
         /* If the wallet is not yet synched, then delay */
         Time_to_Last_block = GetTime() - pindexBest->GetBlockTime();
 
         if ( Time_to_Last_block > 1000 )
         {
-            PushGetBlocks( pfrom,  pindexBest, pindexBest->GetBlockHash());
-        }
-        else
-        {
+            //PushGetBlocks( pfrom,  pindexBest, pindexBest->GetBlockHash());
             PushGetBlocks( pfrom,  pindexBest, uint256(0) );
         }
+ 
         message_ask_filter = 0;
     }
-    else
-    {
-        message_ask_filter++;
-    }
+    //PushGetBlocks( pfrom,  pindexBest, pindexBest->GetBlockHash());
+    PushGetBlocks( pfrom,  pindexBest, uint256(0) );
+    message_ask_filter++;
 
     if ( fDebug )
         LogPrintf("net, received: %s (%u bytes)\n", strCommand, vRecv.size());
@@ -5049,10 +5420,12 @@ CInv Problem_Blocks_Inv;
             pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
             LogPrintf("*** RGP Debug Subversion Check %s \n", pfrom->cleanSubVer );
             if ( pfrom->cleanSubVer == "/SocietyG:3.0.0/"  )
-                LogPrintf("VALID SUBVERSION");
+            {
+                // only report invalide versions of wallet
+            }
             else
             {
-                LogPrintf("INvalid SUBVERSION, DISCONNECTED");
+                LogPrintf("INvalid SUBVERSION, DISCONNECTED node %s \n", pfrom->addr.ToString() );
                 pfrom->fDisconnect = true;
             }
         }
@@ -5195,7 +5568,7 @@ CInv Problem_Blocks_Inv;
 
     else if (strCommand == "verack")
     {
-
+        LogPrintf("VERACK\n");
         pfrom->SetRecvVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
     }
 
@@ -5258,6 +5631,9 @@ CInv Problem_Blocks_Inv;
                         hashKey = Hash(BEGIN(hashKey), END(hashKey));
                         mapMix.insert(make_pair(hashKey, pnode));
                     }
+
+                    MilliSleep( 1 );  /* RGP Otimized */   
+
                     int nRelayNodes = fReachable ? 2 : 1; // limited relaying of addresses outside our network(s)
                     for (multimap<uint256, CNode*>::iterator mi = mapMix.begin(); mi != mapMix.end() && nRelayNodes-- > 0; ++mi)
                         ((*mi).second)->PushAddress(addr);
@@ -5266,6 +5642,9 @@ CInv Problem_Blocks_Inv;
             // Do not store addresses outside our network
             if (fReachable)
                 vAddrOk.push_back(addr);
+             
+            MilliSleep( 1 );  /* RGP Otimized */   
+            
         }
         addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
         if (vAddr.size() < 1000)
@@ -5276,6 +5655,10 @@ CInv Problem_Blocks_Inv;
             LogPrintf("ProcessMessage ONESHOT \n" );
             pfrom->fDisconnect = true;
         }
+        
+        PushGetBlocks( pfrom,  pindexBest, uint256(0) );
+
+        //LogPrintf("RGP Debug ADDR Finished \n");
     }
 
     /* --------------------------------------------------------------------------
@@ -5295,7 +5678,7 @@ CInv Problem_Blocks_Inv;
         vector<CInv> vInv;
         vRecv >> vInv;
 
-//LogPrintf("*** RGP Inventory  %d \n", vInv.size() );
+        //LogPrintf("*** RGP Inventory  %d \n", vInv.size() );
 
         /* RGP, typical inventory is 500 entries, but MAX_INV_SZ is --
                 set to 50000, this shall be optimised to 1000       -- */
@@ -5387,12 +5770,13 @@ CInv Problem_Blocks_Inv;
                    {
 
                        pfrom->AskFor( Inventory_Item, false );
-                       //MilliSleep( 1 ); /* RGP Optimize */
+                       MilliSleep( 1 ); /* RGP Optimize */
                    }
 
                 }
 
-                //PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash() );
+		/* get the source to push blocks from out best index */
+                PushGetBlocks(pfrom, pindexBest, uint256(0) );
 
                 MilliSleep( 1 ); /* RGP Optimize */
             }
@@ -5404,21 +5788,23 @@ CInv Problem_Blocks_Inv;
                 /* RGP test for synch
                    This could mean that we have the inventory,but not the actual blockchain yet
                    ask for blocks from latest blockheight */
-                PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash()  ); /* RGP change the blockhash from 0 */
+                //PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash()  ); /* RGP change the blockhash from 0 */
+                //PushGetBlocks(pfrom, pindexBest, uint256(0)  ); /* RGP change the blockhash from 0 */
+                
 
                 if ( !mapBlockIndex.count( Inventory_Item.hash ) )
                 {
-                    LogPrintf("*** RGP INV processing, we have, check orphans \n");
+                    //LogPrintf("*** RGP INV processing, we have, check orphans \n");
                     pfrom->AskFor( Inventory_Item, false );
-                    MilliSleep( 1 ); /* RGP Optimize */
+                    MilliSleep( 5 ); /* RGP Optimize */
 
                     if ( Inventory_Item.type == MSG_BLOCK && mapOrphanBlocks.count( Inventory_Item.hash ) )
                     {
 
-                        //if ( fDebug )
-                        //{
+                        if ( fDebug )
+                        {
                             LogPrintf("*** RGP Inventory Checking ORPHANBLOCKS FOUND inv hash %s  \n", Inventory_Item.hash.ToString());
-                        //}
+                        }
 
                         /* if we do have the Inventory, why ask? */
                         if ( mapOrphanBlocksByPrev.count( pindexBest->phashBlock ) )
@@ -5433,9 +5819,9 @@ CInv Problem_Blocks_Inv;
 
                         //PushGetBlocks(pfrom, pindexBest, uint256(0) );
 
-                        LogPrintf("*** RGP INV processing, check orphans, it's in orphans \n");
+                        //LogPrintf("*** RGP INV processing, end of Orphan check \n");
 
-                        MilliSleep( 1 ); /* RGP Optimize */
+                        MilliSleep( 5 ); /* RGP Optimize */
                     }
                     else
                     {
@@ -5457,7 +5843,7 @@ CInv Problem_Blocks_Inv;
                         }
 
                         /* Added for MSG_BLOCK  and not in orphan list */
-                         pfrom->AskFor( Inventory_Item, false );
+                        pfrom->AskFor( Inventory_Item, false );
 
 
                         MilliSleep( 1 ); /* RGP Optimize */
@@ -5525,6 +5911,7 @@ CInv Problem_Blocks_Inv;
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
         ProcessGetData(pfrom);
+        MilliSleep(5); /* RGP Optimise */
     }
 
 
@@ -5558,7 +5945,7 @@ CInv Problem_Blocks_Inv;
         Time_to_Last_block = GetTime() - pindexBest->GetBlockTime();
         if ( Time_to_Last_block > 2400  )
         {
-            // LogPrintf("*** RGP ProcessMessage GETBLOCKS, Wallet Synching... \n" );
+            //LogPrintf("*** RGP ProcessMessage GETBLOCKS, Wallet Synching... \n" );
 
             MilliSleep(1);
 
@@ -5589,7 +5976,7 @@ CInv Problem_Blocks_Inv;
             /* RGP, rewrite to send as many as we can, start with 100, then increase
                     have seen it sending the same black back as that requested...       */
 
-            //LogPrint("net, getblocks %d to %s limit %d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), nLimit);
+            //LogPrintf("net, getblocks %d to %s limit %d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), nLimit);
             for (; pindex; pindex = pindex->pnext)
             {
 
@@ -5629,11 +6016,11 @@ CInv Problem_Blocks_Inv;
                 }
 
 
-
+		 MilliSleep(5);
             }
         }
-        //LogPrintf("*** RGP ProcessMessage GETBLOCKS, COMPLETED \n" );
-
+        
+	MilliSleep(1);
     }
     else if (strCommand == "getheaders")
     {
@@ -5644,6 +6031,9 @@ CInv Problem_Blocks_Inv;
         LogPrintf("*** RGP Message received getheaders Debug 001 \n");
 
         LOCK(cs_main);
+
+
+LogPrintf("GETHEADERS\n");
 
         if (IsInitialBlockDownload())
         {
@@ -5686,6 +6076,8 @@ CInv Problem_Blocks_Inv;
             vHeaders.push_back(pindex->GetBlockHeader());
             if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
                 break;
+            
+            MilliSleep(5);
         }
         pfrom->PushMessage("headers", vHeaders);
     }
@@ -5854,8 +6246,8 @@ CInv Problem_Blocks_Inv;
            --     the chain, when synching, which does not help... try to --
            --     get them to produce what we want.                       --
            ----------------------------------------------------------------- */
-      if ( block.GetBlockTime() > ( pindexBest->GetBlockTime() + 50000 ) )
-      {
+        if ( block.GetBlockTime() > ( pindexBest->GetBlockTime() + 50000 ) )
+        {
             /* ------------------------------------------------------------------
                -- The block from the synch node is way in advance, reject this --
                -- block but ask for inventory from the current best block      --
@@ -5863,7 +6255,7 @@ CInv Problem_Blocks_Inv;
             PushGetBlocks(pfrom, pindexBest, pindexBest->GetBlockHash()  );
             //LogPrintf("%");
            //return true;
-      }
+        }
 
         CInv inv(MSG_BLOCK, hashBlock);
         fAlreadyHave = AlreadyHave(txdb, inv );
@@ -5874,8 +6266,8 @@ CInv Problem_Blocks_Inv;
         /* RGP, Don't add if we already have */
         //if ( !fAlreadyHave )
         //{
-        //     LogPrintf("*** RGP BLOCK message hash INventry NOT KNOWN???? %s \n", inv.hash.ToString() );
-        //    pfrom->AddInventoryKnown( inv );
+           // LogPrintf("*** RGP BLOCK message hash INventry NOT KNOWN???? %s \n", inv.hash.ToString() );
+           pfrom->AddInventoryKnown( inv );
         //}
         //else
         //{
@@ -5894,14 +6286,13 @@ CInv Problem_Blocks_Inv;
             //LogPrintf("*** RGP ProcessMessage block ACCEPTED \n" );
             mapAlreadyAskedFor.erase(inv);
 
+	    MilliSleep(5);
+
             return true;
         }
         else
         {
-
-
             //LogPrintf("*** RGP debug Process Block FAILED, may be caused by Staking errors !\n");
-
 
             if (block.nDoS)
             {
@@ -5915,7 +6306,7 @@ CInv Problem_Blocks_Inv;
         if (fSecMsgEnabled)
             SecureMsgScanBlock(block);
 
-        //PushGetBlocks(pfrom,  pindexBest, uint256(0)); /*  mapBlockIndex[inv.hash], uint256(0)); */
+        PushGetBlocks(pfrom,  pindexBest, uint256(0)); /*  mapBlockIndex[inv.hash], uint256(0)); */
         MilliSleep( 1 ); /* RGP Optimize */
 
     }
@@ -5931,18 +6322,26 @@ CInv Problem_Blocks_Inv;
 
         LOCK(cs_main);
 
+LogPrintf("GETADDR...\n");
+
         int64_t nCutOff = GetTime() - (nNodeLifespan * 24 * 60 * 60);
         pfrom->vAddrToSend.clear();
         vector<CAddress> vAddr = addrman.GetAddr();
         BOOST_FOREACH(const CAddress &addr, vAddr)
+        {
             if(addr.nTime > nCutOff)
                 pfrom->PushAddress(addr);
+           
+            MilliSleep( 1 ); /* RGP Optimize */   
+        }
     }
 
 
     else if (strCommand == "mempool")
     {
         LOCK(cs_main);
+
+LogPrintf("MEMPOOL\n");
 
         std::vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
@@ -5953,6 +6352,8 @@ CInv Problem_Blocks_Inv;
             vInv.push_back(inv);
             if (i == (MAX_INV_SZ - 1))
                     break;
+                    
+            MilliSleep(1); /* Optimize */
         }
         if (vInv.size() > 0)
             pfrom->PushMessage("inv", vInv);
@@ -6077,6 +6478,8 @@ CInv Problem_Blocks_Inv;
     else
     {
         //LogPrintf("*** RGP Other message debug 001 > %s \n", strCommand );
+        PushGetBlocks( pfrom,  pindexBest, uint256(0) );
+        MilliSleep( 5 );
 
         if (fSecMsgEnabled)
             SecureMsgReceiveData(pfrom, strCommand, vRecv);
@@ -6120,8 +6523,9 @@ string strCommand;
     if ( pfrom->mapAskFor.size() == 0 )
     {
         /* Nothing being asked for, request. */
-        //LogPrintf("*** RGP ProcessMessages mapAskfor is zero pushing for blocks \n ");
+        // LogPrintf("*** RGP ProcessMessages mapAskfor is zero pushing for blocks \n ");
         PushGetBlocks(pfrom, pindexBest, uint256(0) );
+
     }
 
 
@@ -6153,6 +6557,8 @@ string strCommand;
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty())
     {
+        LogPrintf("RGP ProcessMessages no data from node %s \n", pfrom->addrName );
+        PushGetBlocks(pfrom, pindexBest, uint256(0) );
         return fOk;
     }
 
@@ -6197,7 +6603,8 @@ string strCommand;
             {
                 LogPrintf("*** RGP ProcessMessages TRYING to free the vRecvMsg buffer \n");
                 pfrom->vRecvMsg.erase(pfrom->vRecvMsg.begin(), it);
-
+                LogPrintf(" Node to ban is %s \n", pfrom->addr.ToString() );
+CNode::Ban(pfrom->addr, BanReasonNodeMisbehaving); 
                 MilliSleep( 1 );
             }
             catch (std::ios_base::failure& e)
@@ -6258,8 +6665,22 @@ string strCommand;
         if (nChecksum != hdr.nChecksum)
         {
             LogPrintf("ProcessMessages(%s, %u bytes) : CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n",
-               strCommand, nMessageSize, nChecksum, hdr.nChecksum);
-            continue;
+                                       strCommand, nMessageSize, nChecksum, hdr.nChecksum);
+               
+            /* -----------------------------------------------------------
+               -- RGP, This is causing the system to be killed in Linux --
+               --      This node will now be disconnected and ban score --
+               --      hiked high.                                      --
+               --                                                       --
+               --      Suspect List : 5.189.179.97:23980                --
+               ----------------------------------------------------------- */   
+               
+            CNode::Ban(pfrom->addr, BanReasonNodeMisbehaving);   
+               
+            pfrom->fDisconnect = true;
+            break;				/* break out of the while loop          */
+                                              /* no more messages should be processed */   
+            //continue;
         }
 
         MilliSleep( 1 );
@@ -6747,7 +7168,7 @@ double MoneySupply;
     /* --------------------------------------------------------
        -- RGP, 30th April 2023, Money supply changed to 250M --
        -------------------------------------------------------- */
-    if ( MoneySupply > 250000000.0 )
+    if ( MoneySupply > 450000000.0 )
     {
        /* Maximum MoneySupply has been reached, no more rewards */
        mn_reward = 0;
@@ -6814,7 +7235,6 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
 //    }
     return true;
 }
-
 
 
 
