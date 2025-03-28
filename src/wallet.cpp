@@ -1687,54 +1687,98 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
     }
 }
 
+
 void CWallet::AvailableCoinsMN(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, AvailableCoinsType coin_type, bool useIX) const
 {
-    vCoins.clear();
 
-    {
-        LOCK2(cs_main, cs_wallet);
-        for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
+extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+
+    vCoins.clear();
+    uint256 block_hash;
+
+
+        // RGP is this causing a block?
+        //LOCK2(cs_main, cs_wallet);
+
+        for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it )
         {
+
+
             const CWalletTx* pcoin = &(*it).second;
 
             if (!IsFinalTx(*pcoin))
+            {
+LogPrintf("RGP AvailableCoinsMN NOT IsFinalTx \n");
                 continue;
+            }
 
             if (fOnlyConfirmed && !pcoin->IsTrusted())
+             {
+LogPrintf("RGP AvailableCoinsMN NOT ONLY CONFIRMED and NOT TRUSTED \n");
                 continue;
+            }
 
             if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0)
+             {
+LogPrintf("RGP AvailableCoinsMN CoinBase and Blocks to maturity is not ZERO \n");
                 continue;
+            }
+
 
             if(pcoin->IsCoinStake() && pcoin->GetBlocksToMaturity() > 0)
+             {
+LogPrintf("RGP AvailableCoinsMN Coin STAKE and Blocks to maturity is not ZERO \n");
                 continue;
+            }
+
 
             int nDepth = pcoin->GetDepthInMainChain();
-            if (nDepth <= 0) // SocietyG NOTE: coincontrol fix / ignore 0 confirm
+            if (nDepth <= 0) // SocietyG NOTE: // ignore 0 confirm
+            {
+LogPrintf("RGP AvailableCoinsMN no confirms \n");
                 continue;
+
+            }
 
             // do not use IX for inputs that have less then 6 blockchain confirmations
             if (useIX && nDepth < 10)
+            {
+LogPrintf("RGP AvailableCoinsMN less than 10 confirms \n");
                 continue;
+            }            
 
             for (unsigned int i = 0; i < pcoin->vout.size(); i++)
             {
                 bool found = false;
                 if(coin_type == ONLY_DENOMINATED)
                 {
+LogPrintf("RGP AvailableCoinsMN found, but only DENOM %d \n", pcoin->vout[i].nValue);
                     found = IsDenominatedAmount(pcoin->vout[i].nValue);
                 }
                 else if ( coin_type == ONLY_NOT10000IFMN)
                 {
+
+
+
                     found = !(fMasterNode && pcoin->vout[i].nValue == GetMNCollateral(pindexBest->nHeight)*COIN);
                 }
                 else if (coin_type == ONLY_NONDENOMINATED_NOT10000IFMN)
                 {
-                    if ( IsCollateralAmount(pcoin->vout[i].nValue)) continue; // do not use collateral amounts
-                         found = !IsDenominatedAmount(pcoin->vout[i].nValue);
+
+                    if ( IsCollateralAmount(pcoin->vout[i].nValue)) 
+                    {
+
+LogPrintf("RGP AvailableCoinsMN found, Collatoral Amount %d \n", pcoin->vout[i].nValue);
+                        continue; // do not use collateral amounts
+                    }
+                    
+                    found = !IsDenominatedAmount(pcoin->vout[i].nValue);
 
                     if ( found && fMasterNode)
+                    {
+LogPrintf("RGP AvailableCoinsMN found, HotMN Funds %d \n", pcoin->vout[i].nValue);
                          found = pcoin->vout[i].nValue != GetMNCollateral(pindexBest->nHeight)*COIN; // do not use Hot MN funds
+                    }
                 }
                 else
                 {
@@ -1748,10 +1792,22 @@ void CWallet::AvailableCoinsMN(vector<COutput>& vCoins, bool fOnlyConfirmed, con
                 if (!(pcoin->IsSpent(i)) && mine != ISMINE_NO &&
                     !IsLockedCoin((*it).first, i) && pcoin->vout[i].nValue > 0 &&
                     (!coinControl || !coinControl->HasSelected() || coinControl->IsSelected((*it).first, i)))
-                        vCoins.push_back(COutput(pcoin, i, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO));
+                {
+                    /* RGP, We found a masternode collatoral entry, push back to vCoins */
+
+                    vCoins.push_back(COutput(pcoin, i, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO));
+                }
+                MilliSleep(1);
             }
+
+            MilliSleep( 1 );
         }
-    }
+
+LogPrintf("RGP AvailableCoinsMN End of Loop \n");
+
+
+MilliSleep( 5 );
+
 }
 
 void CWallet::AvailableCoinsForStaking(vector<COutput>& vCoins, unsigned int nSpendTime) const
@@ -4545,15 +4601,29 @@ void CWallet::GetAllReserveKeys(set<CKeyID>& setAddress) const
 
 bool CWallet::UpdatedTransaction(const uint256 &hashTx)
 {
+
+    //LogPrintf("RGP UpdatedTransaction start with hash %s \n", hashTx.ToString() );
+
     {
+//LogPrintf("RGP UpdatedTransaction waiting for a lock \n");
+
         LOCK(cs_wallet);
+
+//LogPrintf("RGP UpdatedTransaction LOCK Success \n");
         // Only notify UI if this transaction is in this wallet
         map<uint256, CWalletTx>::const_iterator mi = mapWallet.find(hashTx);
-        if (mi != mapWallet.end()){
+
+        // RGP, transactions are not being processed on new Masternode
+        //      td::map<uint256, CWalletTx> mapWallet;
+
+        if (mi != mapWallet.end())
+        {
+            LogPrintf("RGP UpdatedTransaction ypdated transcation\n");
             NotifyTransactionChanged(this, hashTx, CT_UPDATED);
             return true;
         }
     }
+
     return false;
 }
 

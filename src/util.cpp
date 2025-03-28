@@ -46,6 +46,8 @@ namespace boost {
 #include <openssl/err.h>
 #include <stdarg.h>
 
+#include "main.h"
+
 #ifdef WIN32
 #ifdef _MSC_VER
 #pragma warning(disable:4786)
@@ -281,7 +283,7 @@ bool LogAcceptCategory(const char* category)
         static boost::thread_specific_ptr<set<string> > ptrCategory;
         if (ptrCategory.get() == NULL)
         {
-            const vector<string>& categories = mapMultiArgs["-debug"];
+            const vector<string>& categories = mapMultiArgs["debug"];
             ptrCategory.reset(new set<string>(categories.begin(), categories.end()));
             // thread_specific_ptr automatically deletes the set when the thread ends.
         }
@@ -495,7 +497,7 @@ vector<unsigned char> ParseHex(const string& str)
 static void InterpretNegativeSetting(string name, map<string, string>& mapSettingsRet)
 {
     // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
-    if (name.find("-no") == 0)
+    if (name.find("no") == 0)
     {
         std::string positive("-");
         positive.append(name.begin()+3, name.end());
@@ -515,6 +517,14 @@ void ParseParameters(int argc, const char* const argv[])
     {
         std::string str(argv[i]);
         std::string strValue;
+
+        /* RGP, quick fix of this code for Masternodes */
+        if ( strValue == "masternodeprivatekey" )
+        {
+           LogPrintf("\n\n RGP util.cpp found masternodeprivatekey %s %s \n \n", strValue,  str );
+           //strMasterNodePrivKey = str(argv[2]);
+        }
+
         size_t is_index = str.find('=');
         if (is_index != std::string::npos)
         {
@@ -526,36 +536,40 @@ void ParseParameters(int argc, const char* const argv[])
         if (boost::algorithm::starts_with(str, "/"))
             str = "-" + str.substr(1);
 #endif
-        if (str[0] != '-')
-            break;
+ //       if (str[0] != '-')
+ //           break;
 
         mapArgs[str] = strValue;
         mapMultiArgs[str].push_back(strValue);
     }
 
     // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
-    {
-        string name = entry.first;
+//    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
+//    {
+//        string name = entry.first;
 
         //  interpret --foo as -foo (as long as both are not set)
-        if (name.find("--") == 0)
-        {
-            std::string singleDash(name.begin()+1, name.end());
-            if (mapArgs.count(singleDash) == 0)
-                mapArgs[singleDash] = entry.second;
-            name = singleDash;
-        }
+//        if (name.find("--") == 0)
+//        {
+//            std::string singleDash(name.begin()+1, name.end());
+//            if (mapArgs.count(singleDash) == 0)
+//                mapArgs[singleDash] = entry.second;
+//            name = singleDash;
+//        }
 
         // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
-        InterpretNegativeSetting(name, mapArgs);
-    }
+//        InterpretNegativeSetting(name, mapArgs);
+//    }
 }
 
 std::string GetArg(const std::string& strArg, const std::string& strDefault)
 {
+
     if (mapArgs.count(strArg))
+    {
         return mapArgs[strArg];
+    }
+
     return strDefault;
 }
 
@@ -568,12 +582,33 @@ int64_t GetArg(const std::string& strArg, int64_t nDefault)
 
 bool GetBoolArg(const std::string& strArg, bool fDefault)
 {
+
+//LogPrintf("RGP Debug strArg Debug 001  %s \n",  strArg.c_str() );
+
+//map<string, string>::iterator it = mapArgs.begin();
+
+//while ( it != mapArgs.end() )
+//{
+//    LogPrintf(" MapArgs %s %S \n", it->first, it->second );
+//    it++;
+//
+//}
+
+
+
     if (mapArgs.count(strArg))
     {
+
         if (mapArgs[strArg].empty())
             return true;
+
+        //LogPrintf("RGP Debug strArg Debug 003  %s  ato1 %d \n",  strArg, atoi(mapArgs[strArg]) );
         return (atoi(mapArgs[strArg]) != 0);
+//LogPrintf("RGP Debug strArg Debug 004  %s \n",  strArg );
     }
+
+    //LogPrintf("RGP Debug strArg Debug 005  %s  %d \n",  strArg.c_str(), mapArgs.count(strArg) );
+
     return fDefault;
 }
 
@@ -1214,8 +1249,8 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
     if (!path.empty())
         return path;
 
-    if (mapArgs.count("-datadir")) {
-        path = fs::system_complete(mapArgs["-datadir"]);
+    if (mapArgs.count("datadir")) {
+        path = fs::system_complete(mapArgs["datadir"]);
         if (!fs::is_directory(path)) {
             path = "";
             return path;
@@ -1239,14 +1274,31 @@ void ClearDatadirCache()
 
 boost::filesystem::path GetConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-conf", "societyG.conf"));
+    boost::filesystem::path pathConfigFile(GetArg("conf", "societyG.conf"));
+    if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
+    return pathConfigFile;
+}
+
+/* -------------------------------------------------------------------------
+   -- RGP, added new file for Masternode configurations, this file will   --
+   --      hold a masternode IP, transaction id and associeted blockhash. --
+   --      As the 'old' code in wallets in not deteecting mempool as      --
+   --      always blank. 
+   --      static map < uint256, CTransaction > Active_Transaction_List;  --
+   --      will be filled with txid and blockhash for fast access to      --
+   --      Masternode key data.                                           --
+   ------------------------------------------------------------------------- */
+
+boost::filesystem::path Get_MN_ConfigFile()
+{
+    boost::filesystem::path pathConfigFile(GetArg("conf", "mn_config.conf"));
     if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
     return pathConfigFile;
 }
 
 boost::filesystem::path GetMasternodeConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-mnconf", "masternode.conf"));
+    boost::filesystem::path pathConfigFile(GetArg("mnconf", "masternode.conf"));
     if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir() / pathConfigFile;
     return pathConfigFile;
 }
@@ -1277,7 +1329,7 @@ void ArgsManager::ReadConfigFile(const std::string& confPath)
         m_config_args.clear();
     }
 
-    boost::filesystem::path GetConfigFile();
+    //boost::filesystem::path GetConfigFile();
 
     //fs::ifstream stream(GetConfigFile(confPath));
 
@@ -1294,14 +1346,150 @@ void ArgsManager::ReadConfigFile(const std::string& confPath)
     // If datadir is changed in .conf file:
     //ClearDatadirCache();
     //if (!fs::is_directory(GetDataDir(false))) {
-    //    throw std::runtime_error(strprintf("specified data directory \"%s\" does not exist.", gArgs.GetArg("-datadir", "").c_str()));
+    //    throw std::runtime_error(strprintf("specified data directory \"%s\" does not exist.", gArgs.GetArg("datadir", "").c_str()));
     //}
 }
 
+/* --
+   -- RGP read from Bitcoind.cpp */
 
+/* -------------------------------------------------------------------------
+   -- RGP, added new file for Masternode configurations, this file will   --
+   --      hold a masternode IP, transaction id and associeted blockhash. --
+   --      As the 'old' code in wallets in not deteecting mempool as      --
+   --      always blank. 
+   --      static map < uint256, CTransaction > Active_Transaction_List;  --
+   --      will be filled with txid and blockhash for fast access to      --
+   --      Masternode key data.                                           --
+   ------------------------------------------------------------------------- */
+
+bool getblockbynumber(int block_to_read, CBlock block )
+{
+ 
+    int nHeight = block_to_read;
+
+
+
+    if (nHeight < 0 || nHeight > pindexBest->nHeight)
+        return false;
+//        throw runtime_error("getblockbynumber Block number out of range.");
+
+    //CBlock block;
+    CBlockIndex* pblockindex = mapBlockIndex[hashBestChain];
+    while (pblockindex->nHeight > nHeight)
+        pblockindex = pblockindex->pprev;
+
+    uint256 hash = *pblockindex->phashBlock;
+
+LogPrintf("RGP getblockbynumber height %d hash_found %s best %d \n", nHeight, hash.ToString(), pindexBest->nHeight );
+
+    pblockindex = mapBlockIndex[hash];
+    block.ReadFromDisk(pblockindex, true);
+
+    return true;
+}
+
+
+
+
+#include <stdlib.h>
+
+
+extern map<uint256, CBlockIndex*> mapBlockIndex;
+
+void Read_MN_Config()
+{
+
+LogPrintf("RGP Read_MN_Config START \n" );
+
+std::string str_HEIGHT;
+uint256 hashBlock;
+CTransaction tx;
+int block_height;
+CBlock block_by_height;
+
+    boost::filesystem::ifstream streamConfig(Get_MN_ConfigFile());
+    if (!streamConfig.good()){
+        // Create empty societyG.conf if it does not exist
+        FILE* configFile = fopen( Get_MN_ConfigFile().string().c_str(), "a" );
+        if (configFile != NULL)
+            fclose(configFile);
+        return; // Nothing to read, so just return
+    }
+
+    set<string> setOptions;
+    setOptions.insert("*");
+
+    /* Reads in a line at a time */
+    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    {
+        string strKey = it->string_key;
+        string strValue = it->value[0];
+
+        LogPrintf("RGP Debug Read_MN_Config key %s %s \n", &strKey[0], &strValue[0] );
+
+        /* RGP each line has either IP, BLOCK or TXID */
+        if ( strKey == "HEIGHT" )
+        {
+            str_HEIGHT = strValue;
+
+LogPrintf("RGP Read_MN_Config Debug 001 %s \n", str_HEIGHT );
+
+            block_height = std::atoi ( &str_HEIGHT[0] );
+            
+            LogPrintf("RGP Read_MN_Config block height %d \n", block_height );
+
+//            if ( getblockbynumber( block_height, block_by_height ) != false )
+            {
+
+                int nHeight = block_height;
+                if (nHeight < 0 || nHeight > pindexBest->nHeight)
+                    return false;
+                //        throw runtime_error("getblockbynumber Block number out of range.");
+
+                CBlock block;
+                CBlockIndex* pblockindex = mapBlockIndex[hashBestChain];
+                while (pblockindex->nHeight > nHeight)
+                    pblockindex = pblockindex->pprev;
+
+                uint256 hash = *pblockindex->phashBlock;
+
+LogPrintf("RGP getblockbynumber height %d hash_found %s best %d \n", nHeight, hash.ToString(), pindexBest->nHeight );
+
+                pblockindex = mapBlockIndex[hash];
+                block.ReadFromDisk(pblockindex, true);
+
+
+                hashBlock = block.GetHash();
+                
+                /* the last transaction has the MN information */
+                tx = block.vtx[ 2 ] ;
+
+                if ( Active_Transaction_List.count ( hashBlock ) == 0  )                    
+                    Active_Transaction_List.insert(std::make_pair( hashBlock, tx ));
+
+                continue;
+
+            }
+
+       }        
+
+    }
+
+LogPrintf("RGP Read_MN_Config END \n" );
+
+    // If datadir is changed in .conf file:
+    ClearDatadirCache();
+}
+
+
+/* --
+   -- RGP read from Bitcoind.cpp */
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
+LogPrintf("RGP ReadConfigFile START \n" );
+
     boost::filesystem::ifstream streamConfig(GetConfigFile());
     if (!streamConfig.good()){
         // Create empty societyG.conf if it does not exist
@@ -1316,8 +1504,12 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 
     for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
     {
-        // Don't overwrite existing settings so command line settings override bitcoin.conf
+        // Don't overwrite existing settings so command line settings override societyG.conf
+        // Note : RGP "-" is added here.
         string strKey = string("-") + it->string_key;
+        string strValue = it->value[0];
+
+        //printf("RGP Debug ReadConfigFile key %s %s \n", &strKey[0], &strValue[0] );
         if (mapSettingsRet.count(strKey) == 0)
         {
             mapSettingsRet[strKey] = it->value[0];
@@ -1325,6 +1517,8 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
             InterpretNegativeSetting(strKey, mapSettingsRet);
         }
         mapMultiSettingsRet[strKey].push_back(it->value[0]);
+
+ 
     }
     // If datadir is changed in .conf file:
     ClearDatadirCache();
@@ -1332,7 +1526,7 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 
 boost::filesystem::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "societyGd.pid"));
+    boost::filesystem::path pathPidFile(GetArg("pid", "societyGd.pid"));
     if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
@@ -1451,7 +1645,9 @@ int64_t GetTimeOffset()
 
 int64_t GetAdjustedTime()
 {
+
     return GetTime() + GetTimeOffset();
+
 }
 
 void AddTimeData(const CNetAddr& ip, int64_t nTime)
@@ -1725,10 +1921,10 @@ ArgsManager::ArgsManager() :
      * between mainnet and regtest/testnet won't cause problems due to these
      * parameters by accident. */
     m_network_only_args{
-      "-addnode", "-connect",
-      "-port", "-bind",
-      "-rpcport", "-rpcbind",
-      "-wallet",
+      "addnode", "connect",
+      "port", "bind",
+      "rpcport", "rpcbind",
+      "wallet",
     }
 {
     // nothing to do
@@ -1863,9 +2059,14 @@ int64_t ArgsManager::GetArg(const std::string& strArg, int64_t nDefault) const
 
 bool ArgsManager::GetBoolArg(const std::string& strArg, bool fDefault) const
 {
-    if (IsArgNegated(strArg)) return false;
+LogPrintf("RGP GetBoolArg debug 1 %s \n, strArg");
+    if (IsArgNegated(strArg)) 
+       return false;
+LogPrintf("RGP GetBoolArg debug 2 \n");
     std::pair<bool,std::string> found_res = ArgsManagerHelper::GetArg(*this, strArg);
-    if (found_res.first) return InterpretBool(found_res.second);
+LogPrintf("RGP GetBoolArg debug 3 %s \n, strArg");
+    if (found_res.first) 
+       return InterpretBool(found_res.second);
     return fDefault;
 }
 
@@ -1917,7 +2118,7 @@ std::string HelpMessageOpt(const std::string &option, const std::string &message
 
 std::string ArgsManager::GetHelpMessage()
 {
-    const bool show_debug = gArgs.GetBoolArg("-help-debug", false);
+    const bool show_debug = gArgs.GetBoolArg("help-debug", false);
 
     std::string usage = HelpMessageGroup("Options:");
 

@@ -97,7 +97,7 @@ UniValue getinfo ( const UniValue& params, bool fHelp )
             "getinfo\n"
             "Returns an object containing various state info.");
 
-printf("RGP Debug getinfo Test %d \n", pindexBest->nMoneySupply );
+LogPrintf("RGP Debug getinfo start \n");
 
     proxyType proxy;
     GetProxy(NET_IPV4, proxy);
@@ -105,10 +105,13 @@ printf("RGP Debug getinfo Test %d \n", pindexBest->nMoneySupply );
     UniValue obj(UniValue::VOBJ);
     UniValue diff(UniValue::VOBJ);
 
+LogPrintf("RGP Debug getinfo debug 001 \n");
 
     obj.push_back(Pair("version",       FormatFullVersion()));
     obj.push_back(Pair("protocolversion",(int)PROTOCOL_VERSION));
     
+LogPrintf("RGP Debug getinfo debug 002 \n");
+
 #ifdef ENABLE_WALLET
     if (pwalletMain) 
     {
@@ -121,6 +124,8 @@ printf("RGP Debug getinfo Test %d \n", pindexBest->nMoneySupply );
        obj.push_back(Pair("stake",         ValueFromAmount(pwalletMain->GetStake())));
    }
 #endif
+
+LogPrintf("RGP Debug getinfo 001 \n");
 
 #ifndef LOWMEM
     obj.push_back(Pair("moneysupply",   ValueFromAmount(pindexBest->nMoneySupply)));
@@ -155,6 +160,8 @@ printf("RGP Debug getinfo Test %d \n", pindexBest->nMoneySupply );
 #endif
 
 	obj.push_back(Pair("errors",        GetWarnings("statusbar")));
+
+LogPrintf("RGP Debug getinfo exit \n");
     
     return obj;
 }

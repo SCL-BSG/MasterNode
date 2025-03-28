@@ -36,6 +36,8 @@ void InitRPCMining()
         return;
     }
 
+LogPrintf("RGP Debug InitRPCMining \n");
+
     // getwork/getblocktemplate mining rewards paid here:
     pMiningKey = new CReserveKey(pwalletMain);
 }
@@ -111,7 +113,7 @@ UniValue getgenerate(const UniValue& params, bool fHelp)
     if (!pMiningKey)
         return false;
 
-    return GetBoolArg("-gen", false);
+    return GetBoolArg("gen", false);
 }
 
 
@@ -144,7 +146,7 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
     {
         int nGenProcLimit = std::stoi(params[1].get_str());
 
-        mapArgs["-genproclimit"] = itostr(nGenProcLimit);
+        mapArgs["genproclimit"] = itostr(nGenProcLimit);
 
         if (nGenProcLimit == 0)
         {
@@ -160,7 +162,7 @@ UniValue setgenerate(const UniValue& params, bool fHelp)
         }
     }
 
-    mapArgs["-gen"] = (fGenerate ? "1" : "0");
+    mapArgs["gen"] = (fGenerate ? "1" : "0");
 
     assert(pwalletMain != NULL);
     
@@ -185,6 +187,9 @@ UniValue gethashespersec(const UniValue& params, bool fHelp)
 
 UniValue getmininginfo(const UniValue& params, bool fHelp)
 {
+int64_t Time_to_Last_block, Time_in_since_Last_Block, last_recorded_block_time, time_to_sleep, after_stake_success_timeout;
+int64_t Last_known_block_time;
+
     if (fHelp || params.size() != 0)
     {
         throw runtime_error(
@@ -194,6 +199,21 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
 
     uint64_t nWeight = 0;
     
+    //Last_known_block_time = pindexBest->GetBlockTime();  // RGP, wait if necessary for next block, then start mining
+
+   //LogPrintf("Debug getmininginfo time %d \n", GetTime() - Last_known_block_time );
+
+   //if ( GetTime() - Last_known_block_time > 300 )
+   //{
+   // LogPrintf("Debug getmininginfo MINE \n" );
+   //    /* mine */ 
+  // } 
+  // else 
+  // {
+  //     return -1;
+  // }
+
+
     if (pwalletMain)
     {
         nWeight = pwalletMain->GetStakeWeight();
@@ -213,8 +233,8 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
     diff.push_back(Pair("search-interval",      (int)nLastCoinStakeSearchInterval));
     obj.push_back(Pair("difficulty",            GetDifficulty(GetLastBlockIndex(pindexBest, true))));
 
-    obj.push_back(Pair("generate",              GetBoolArg("-gen", false)));
-    obj.push_back(Pair("genproclimit",          (int)GetArg("-genproclimit", -1)));
+    obj.push_back(Pair("generate",              GetBoolArg("gen", false)));
+    obj.push_back(Pair("genproclimit",          (int)GetArg("genproclimit", -1)));
     //obj.push_back(Pair("hashespersec",        gethashespersec(params, false)));
 
     obj.push_back(Pair("blockvalue",            (int64_t)GetProofOfStakeReward(pindexBest->pprev, 0, 0)));
@@ -275,7 +295,7 @@ double nNetworkWeight;
     UniValue obj(UniValue::VOBJ);
     //Object obj;
 
-    obj.push_back(Pair("enabled",           GetBoolArg("-staking", true)));
+    obj.push_back(Pair("enabled",           GetBoolArg("staking", true)));
     obj.push_back(Pair("staking",           staking));
     obj.push_back(Pair("errors",            GetWarnings("statusbar")));
 
@@ -525,7 +545,7 @@ UniValue getworkex(const UniValue& params, bool fHelp)
         CTransaction coinbaseTx = pblock->vtx[0];
         std::vector<uint256> merkle = pblock->GetMerkleBranch(0);
 
-         LogPrintf("*** RGP rpcmining after FormatHashBuffer debug 001\n");
+        LogPrintf("*** RGP rpcmining after FormatHashBuffer debug 001\n");
 
         UniValue result(UniValue::VOBJ);
         //Object result;
@@ -608,11 +628,22 @@ UniValue getworkex(const UniValue& params, bool fHelp)
     }
 }
 
+/* ----------------------------------------------------------------------------- 
+   -- RGP, getwork is a JSON-RPC method sent over HTTP transport.             
+   --                                                                         --
+   --      getwork accepts one optional parameter, this must be provided by a --
+   --      prior request.                                                     --
+   --                                                                         --
+   --      getwork without arguments provides the block header for a miner    --
+   --      to find the solution.                                              --
+   ----------------------------------------------------------------------------- */
 
 UniValue getwork(const UniValue& params, bool fHelp)
 {
+bool process_block_found_status;
+typedef map<uint256, pair<CBlock*, CScript> > mapNewBlock_t;
 
-
+    LogPrintf("RGP DEBUG getwork 001 \n");
 
     if (fHelp || params.size() > 1)
     {
@@ -625,16 +656,16 @@ UniValue getwork(const UniValue& params, bool fHelp)
                             "  \"target\" : little endian hash target\n"
                             "If [data] is specified, tries to solve the block and returns true if it was successful.");
     }
+    else
+        LogPrintf("RG DEBUG Param is ZERO \n");
 
     if (vNodes.empty())
     {
-
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "SocietyG is not connected!");
     }
 
     if (IsInitialBlockDownload())
     {
-
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "SocietyG is downloading blocks...");
     }
 
@@ -644,36 +675,53 @@ UniValue getwork(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_MISC_ERROR, "No more PoW blocks");
     }
 
-    typedef map<uint256, pair<CBlock*, CScript> > mapNewBlock_t;
     
-    static mapNewBlock_t mapNewBlock;    // FIXME: thread safety
-    static vector<CBlock*> vNewBlock;
 
+    LogPrintf("RGP DEBUG getwork 004 \n");
+
+    static mapNewBlock_t mapNewBlock;   // FIXME: thread safety
+    static vector<CBlock*> vNewBlock;
+    bool status;
+    
     if (params.size() == 0)
     {
+   LogPrintf("RGP DEBUG getwork 005 parameter size is 0 \n");
+static CBlockIndex* pindexPrev;
+CBlockIndex* pindexTest = pindexBest; /* RGP, use to wait for pindexBest changing */
+ //       do 
+ //       {
+ //          MilliSleep ( 5000 );
+ //          LogPrintf("RGP GetWork delating 5 seconds for index to change \n");
+ //       } while ( pindexTest == pindexBest );
+
 
         // Update block
         static unsigned int nTransactionsUpdatedLast;
-        static CBlockIndex* pindexPrev;
-        static int64_t nStart;
+        //static CBlockIndex* pindexPrev;
+        static int64_t nStart, fees;
         static CBlock* pblock;
+
+        
+
+
+
 
         if (pindexPrev != pindexBest || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60))
         {
-
-            if (pindexPrev != pindexBest)
-            {
+   LogPrintf("RGP DEBUG getwork 006 \n");
+           if (pindexPrev != pindexBest)
+           {
 
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
-                
+                   LogPrintf("RGP DEBUG getwork 007 \n");
                 BOOST_FOREACH(CBlock* pblock, vNewBlock)
                 {
-                    delete pblock;
+                   delete pblock;
                 }
 
-                vNewBlock.clear();
-            }
+               vNewBlock.clear();
+           }
 
             // Clear pindexPrev so future getworks make a new block, despite any failures from here on
             pindexPrev = NULL;
@@ -681,14 +729,24 @@ UniValue getwork(const UniValue& params, bool fHelp)
             // Store the pindexBest used before CreateNewBlock, to avoid races
             nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
             CBlockIndex* pindexPrevNew = pindexBest;
+            
             nStart = GetTime();
 
+            LogPrintf("RGP Debug getwork 006a before CreatNewBlock \n");
+
             // Create new block
-            pblock = CreateNewBlock(*pMiningKey);
+            /* RGP, replaced auto_ptr with unique_ptr */
+            /* auto_ptr<CBlock> pblocktemplate(CreateNewBlockWithKey(reservekey, pwallet)); */
+            
+            //unique_ptr<CBlock> pblocktemplate(CreateNewBlockWithKey(reservekey, pwallet));
+
+            
+            pblock = CreateNewBlock( *pMiningKey );
+LogPrintf("RGP Debug after CreateNewBlock \n");
 
             if (!pblock)
             {
-
+LogPrintf("RGP Debug after CreateNewBlock pointer failed \n");
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
             }
             
@@ -698,7 +756,7 @@ UniValue getwork(const UniValue& params, bool fHelp)
             pindexPrev = pindexPrevNew;
         }
 
-
+   LogPrintf("RGP DEBUG getwork 008 \n");
         // Update nTime
         pblock->UpdateTime(pindexPrev);
         pblock->nNonce = 0;
@@ -716,6 +774,8 @@ UniValue getwork(const UniValue& params, bool fHelp)
         char phash1[64];
         FormatHashBuffers(pblock, pmidstate, pdata, phash1);
 
+   LogPrintf("RGP DEBUG getwork 009 \n");
+
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
         UniValue result(UniValue::VOBJ);
@@ -725,15 +785,26 @@ UniValue getwork(const UniValue& params, bool fHelp)
         result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
         result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
         result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
+  LogPrintf("RGP DEBUG getwork 0010 \n");
+
         
+        /* Result is type UniValue with parameters of midstate, data, hash1 and target 
+           This is returned to the miner that used RPC                                   */
+
         return result;
     }
     else
     {
-
+ LogPrintf("RGP DEBUG getwork 005a parameter size is more than 0 \n");
         // Parse parameters
+
+LogPrintf("RGP DEBUG getwork 005b \n");
+
         vector<unsigned char> vchData = ParseHex(params[0].get_str());
-        
+
+LogPrintf("RGP DEBUG getwork 005c \n");
+
+LogPrintf("RGP DEBUG getwork 0011 \n");
         if (vchData.size() != 128)
         {
 
@@ -764,7 +835,13 @@ UniValue getwork(const UniValue& params, bool fHelp)
 
         assert(pwalletMain != NULL);
         
-        return ProcessBlockFound(pblock, *pwalletMain, *pMiningKey);
+   LogPrintf("RGP DEBUG getwork 0020 \n");
+
+
+        process_block_found_status = ProcessBlockFound(pblock, *pwalletMain, *pMiningKey);
+
+
+        return process_block_found_status;
     }
 }
 
@@ -802,6 +879,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
 
     std::string strMode = "template";
 
+    LogPrintf("RGP Debug GetBlockTemplate parameter count %d \n", params.size() );
+
     if (params.size() > 0)
     {
     
@@ -814,6 +893,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         if (modeval.type() == UniValue::VSTR)
         {
             strMode = modeval.get_str();
+LogPrintf("RGP Debug GetBlockTemplate strmode %s \n", strMode );
         }
         else if (modeval.type() == UniValue::VNULL)
         {
@@ -844,6 +924,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     {
         throw JSONRPCError(RPC_MISC_ERROR, "No more PoW blocks");
     }
+
+LogPrintf("RGP Debug GetBlockTemplate Update Block \n");
 
     // Update block
     static unsigned int nTransactionsUpdatedLast;
@@ -973,6 +1055,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     result.push_back(Pair("curtime",                (int64_t)pblock->nTime));
     result.push_back(Pair("bits",                   strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height",                 (int64_t)(pindexPrev->nHeight+1)));
+
+LogPrintf("RGP Debug GetBlockTemplate Completed \n");
 
     return result;
 }

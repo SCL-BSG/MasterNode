@@ -7,6 +7,12 @@
 #ifndef BITCOIN_MAIN_H
 #define BITCOIN_MAIN_H
 
+/* ------------------------------------------------------------------
+   -- Date : 19th October 2024                                     --
+   --                                                              --
+   -- RGP, Updated to add new class CBlock function RemoveBadBlock --
+   ------------------------------------------------------------------ */
+
 //#include "amount.h"
 #include "core.h"
 #include "bignum.h"
@@ -35,7 +41,7 @@ static const int64_t TARGET_SPACING = 4 * 60; //240 sec
 #define INSTANTX_SIGNATURES_TOTAL              15
 
 #define MASTERNODE_COLLATERAL                  150000    /* SocietyG Coin Masternode Collateral */
-#define SUPERNODE_COLLATERAl                   2000000
+#define SUPERNODE_COLLATERAL                   7500000   /* SuperNade Collateral                */
 #define WALLET_STAKE_COLLATERAL                7500      /* Society Gold minimum stake amount   */
 
 class CBlock;
@@ -52,6 +58,8 @@ class CWallet;
 //};
 typedef map<uint256, CBlockIndex*> BlockMap;
 extern BlockMap mapBlockIndexmice;
+
+extern map < uint256, CTransaction > Active_Transaction_List;
 
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
 static const unsigned int MAX_BLOCK_SIZE = 30000000;  //30MB
@@ -124,7 +132,7 @@ extern int64_t nLastCoinStakeSearchInterval;
 extern const std::string strMessageMagic;
 extern int64_t nTimeBestReceived;
 extern bool fImporting;
-extern bool fReindex;
+extern bool fReindex; 
 struct COrphanBlock;
 extern std::map<uint256, COrphanBlock*> mapOrphanBlocks;
 extern bool fHaveGUI;
@@ -193,6 +201,10 @@ int64_t GetProofOfStakeReward(const CBlockIndex* pindexPrev, int64_t nCoinAge, i
 bool IsInitialBlockDownload();
 bool IsConfirmedInNPrevBlocks(const CTxIndex& txindex, const CBlockIndex* pindexFrom, int nMaxDepth, int& nActualDepth);
 std::string GetWarnings(std::string strFor);
+
+/* MN only GetTransaction */
+bool Get_MN_Transaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
+
 bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
 uint256 WantedByOrphan(const COrphanBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
@@ -419,8 +431,10 @@ public:
         try {
             filein >> *this;
         }
-        catch (std::exception &e) {
-            return error("%s() : RGP caused by ConnectBlock and FetchInputs issue : deserialize or I/O error", __PRETTY_FUNCTION__);
+        catch (std::exception &e) 
+        {
+            /* let try no return, as this "filein >> *this" is a test */
+            //return error("%s() : RGP caused by ConnectBlock and FetchInputs issue : deserialize or I/O error", __PRETTY_FUNCTION__);
         }
         
         // Return file pointer
@@ -509,6 +523,9 @@ public:
     bool GetCoinAge(CTxDB& txdb, const CBlockIndex* pindexPrev, uint64_t& nCoinAge) const;
 
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
+
+    int64_t GetOutputFor_Other(const CTxIn& input, const MapPrevTx& inputs) const;
+
 };
 
 
@@ -957,6 +974,14 @@ public:
     bool ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck=false);
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true);
     bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
+
+    /* -----------------------------------------------------------------------------------------
+       -- Added new routine to delete bad stake blocks, that were accepted by never confirmed --
+       ----------------------------------------------------------------------------------------- */
+    bool MN_Disconnect_Block( CBlockIndex* pindex );
+
+    //bool RemoveBadBlock(CTxDB& txdb, CBlockIndex* pindexNew);
+
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const uint256& hashProof);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
     bool AcceptBlock();

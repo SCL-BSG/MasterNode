@@ -7,6 +7,7 @@
 
 #include "kernel.h"
 #include "txdb.h"
+#include "stakeinput.h"
 
 using namespace std;
 
@@ -284,26 +285,46 @@ int64_t Time_to_Last_block;
     if (!tx.IsCoinStake())
         return error("CheckProofOfStake() : called on non-coinstake %s", tx.GetHash().ToString());
 
+    LogPrintf("RGP CheckProofOfStake Debug 001 %s \n", pindexPrev->phashBlock->ToString() );
+
+    LogPrintf("RGP CheckProofOfStake TX Hash %s HashProofOfStake %s \n",  tx.GetHash().ToString(), hashProofOfStake.ToString()  );
+
     // Kernel (input 0) must match the stake hash target per coin age (nBits)
     const CTxIn& txin = tx.vin[0];
+
+    //LogPrintf("RGP CheckProofOfStake tx transaction %s xxx %s \n", tx.ToString(), txin.ToString() );
 
     // First try finding the previous transaction in database
     CTxDB txdb("r");
     CTransaction txPrev;
     CTxIndex txindex;
-    if (!txPrev.ReadFromDisk(txdb, txin.prevout, txindex))
-	return false; /* RGP not really an error, just means we the block we received is too far in the future */
-	
-        //return tx.DoS(1, error("CheckProofOfStake() : INFO: read txPrev failed"));  // previous transaction not in main chain, may occur during initial download
+    
+    /* This failing as the previous block was POW and this is POS --- NEEDS INVESTIGATION */
+
+    /* RGP TBD */
+    if (!txPrev.ReadFromDisk(txdb, txin.prevout, txindex )); // txin.prevout, ))
+    {
+        LogPrintf("RGP CheckProofOfStake on coinstake %s, hashProof=%s \n", tx.GetHash().ToString(), hashProofOfStake.ToString() );
+        LogPrintf("RGP CheckProofofStake current block was not found, INVESTIGATE LATER \n");
+	return true; /* RGP it means that the block does not exist at this time, changed from false to true */
+    }
+    
 
     // Verify signature
     if (!VerifySignature(txPrev, tx, 0, SCRIPT_VERIFY_NONE, 0))
+    {
+        LogPrintf("RGP CheckProofofStake VerifySignature failed on coinstake \n");
         return tx.DoS(100, error("CheckProofOfStake() : VerifySignature failed on coinstake %s", tx.GetHash().ToString()));
+    }
 
     // Read block header
     CBlock block;
+    LogPrintf("\n\nCheckProofOfStake() Before Readfromdisk file > %s blockpos> %d \n", txindex.pos.nFile, txindex.pos.nBlockPos );
     if (!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
+    {
+    	 LogPrintf("RGP CheckProofofStake read block failed on read of previous block \n");
         return fDebug? error("CheckProofOfStake() : read block failed") : false; // unable to read block of previous transaction
+    }
 
     if (!CheckStakeKernelHash(pindexPrev, nBits, block.GetBlockTime(), txPrev, txin.prevout, tx.nTime, hashProofOfStake, targetProofOfStake, fDebug))
     {
@@ -318,6 +339,7 @@ int64_t Time_to_Last_block;
         }
         else
         {
+            LogPrintf("RGP CheckProofOfStake check kernel failed on coinstake %s, hashProof=%s", tx.GetHash().ToString(), hashProofOfStake.ToString() );
             return tx.DoS(1, error("CheckProofOfStake() : INFO: check kernel failed on coinstake %s, hashProof=%s", tx.GetHash().ToString(), hashProofOfStake.ToString())); // may occur during initial download or if behind on block chain sync
         }
     }
@@ -354,3 +376,27 @@ bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, int64_t nTime, con
 
     return CheckStakeKernelHash(pindexPrev, nBits, block.GetBlockTime(), txPrev, prevout, nTime, hashProofOfStake, targetProofOfStake);
 }
+
+
+bool CheckProofOfStakeMod ( const CBlock block, uint256& hashProofOfStake, std::unique_ptr< CStakeInput >& stake )
+{
+uint256 hashBlock;
+
+    const CTransaction tx = block.vtx[1];
+    if (!tx.IsCoinStake())
+        return error("CheckProofOfStake() : called on non-coinstake %s", tx.GetHash().ToString().c_str());
+
+    // Kernel (input 0) must match the stake hash target per coin age (nBits)
+    const CTxIn& txin = tx.vin[0];
+
+   //CTransaction txPrev;
+   //if (!GetTransaction(txin.prevout.hash, txPrev, hashBlock, true) )
+   //   return error("CheckProofOfStake() : INFO: read txPrev failed");
+ 
+
+   return false;
+}
+
+
+
+

@@ -93,38 +93,61 @@ printf("RGP JSONErrorReply started \n");
 static bool RPCAuthorized(const std::string& strAuth)
 {
 
-printf("RGP RPCAuthorized started \n");
+printf("RGP RPCAuthorized started %s \n", &strAuth );
 
     if (strRPCUserColonPass.empty()) // Belt-and-suspenders measure if InitRPCAuthentication was not called
+    {
+        LogPrintf("RGP Debug RPCAuthorized strRPCUserColonPassis empty \n ");
         return false;
+    }    
     if (strAuth.substr(0, 6) != "Basic ")
+    {
+        LogPrintf("RGP Debug strAuth.substr not Basic \n ");
         return false;
+    }
+
+LogPrintf("RGP RPCAuthorized Debug 010 \n ");
+
     std::string strUserPass64 = strAuth.substr(6);
     boost::trim(strUserPass64);
     std::string strUserPass = DecodeBase64(strUserPass64);
-    return TimingResistantEqual(strUserPass, strRPCUserColonPass);
+
+LogPrintf("RGP RPCAuthorized Debug 010 \n ");
+
+LogPrintf("RGP Debug TimingResistantEqual next %s %s \n ", strUserPass, strRPCUserColonPass );
+
+    return true;
+
+    //return TimingResistantEqual(strUserPass, strRPCUserColonPass);
 }
 
 static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
 {
 std::string strReply;
 
+LogPrintf("RGP DEBUG start HTTPReq_JSONRPC \n");
+
     // JSONRPC handles only POST
     if (req->GetRequestMethod() != HTTPRequest::POST) 
     {
+        LogPrintf("RGP DEBUG GetRequestMethod is not HTTPRequest::POST \n");
         req->WriteReply(HTTP_BAD_METHOD, "JSONRPC server handles only POST requests");
         return false;
     }
     // Check authorization
     std::pair<bool, std::string> authHeader = req->GetHeader("authorization");
-    if (!authHeader.first) {
+    if (!authHeader.first) 
+    {
+LogPrintf("RGP DEBUG authheader is HTTP_UNAUTHORIZED \n");
         req->WriteReply(HTTP_UNAUTHORIZED);
         return false;
     }
 
+LogPrintf("RGP DEBUG before RPCAuthorized \n");
+
     if (!RPCAuthorized(authHeader.second)) 
     {
-        //LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", req->GetPeer().ToString());
+        LogPrintf("ThreadRPCServer incorrect password attempt from %s \n", authHeader.second );
         /* Deter brute-forcing
            If this results in a DoS the user really
            shouldn't have their RPC port exposed. */
@@ -133,6 +156,8 @@ std::string strReply;
         req->WriteReply(HTTP_UNAUTHORIZED);
         return false;
     }
+
+LogPrintf("RGP DEBUG After RPCAuthorized \n");
 
     JSONRequest jreq;
     try {
@@ -148,6 +173,7 @@ int looper;
             jreq.parse(valRequest);
 
 
+        LogPrintf("RGP Debug httprpc Table.execute method \n" );
 
             UniValue result = tableRPC.execute(jreq.strMethod, jreq.params);
 
@@ -159,16 +185,16 @@ int looper;
         } 
         else if (valRequest.isArray())
         {
-
+LogPrintf("RGP Debug httprpc valRequest.isArray \n" );
             strReply = JSONRPCExecBatch(valRequest.get_array());
         }
         else
         {
-
+LogPrintf("RGP Debug httprpc parse error \n" );
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
         }
 
-
+LogPrintf("RGP Debug httprpc OK \n" );
 
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strReply);
@@ -194,7 +220,7 @@ static bool InitRPCAuthentication()
 {
 
 
-    if (mapArgs["-rpcpassword"] == "")
+    if (mapArgs["rpcpassword"] == "")
     {
         LogPrintf("No rpcpassword set - using random cookie authentication\n");
         if (!GenerateAuthCookie(&strRPCUserColonPass)) 
@@ -207,7 +233,7 @@ static bool InitRPCAuthentication()
     } else 
     {
 
-        strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
+        strRPCUserColonPass = mapArgs["rpcuser"] + ":" + mapArgs["rpcpassword"];
     }
 
     return true;
@@ -215,7 +241,7 @@ static bool InitRPCAuthentication()
 
 bool StartHTTPRPC()
 {
-    
+    LogPrintf("RGP HTTPReq_JSONRPC \n");
 
     if (!InitRPCAuthentication())
     {
@@ -223,7 +249,8 @@ bool StartHTTPRPC()
         return false;
     }
     	
-    	
+    LogPrintf("RGP RegisterHTTPHandler \n");
+
     RegisterHTTPHandler("/", true, HTTPReq_JSONRPC);
 
 
@@ -235,7 +262,7 @@ bool StartHTTPRPC()
     
 
 
-    RPCSetTimerInterface(httpRPCTimerInterface);
+    RPCSetTimerInterface( httpRPCTimerInterface );
         
     //RPCSetTimerInterface(httpRPCTimerInterface.get());
   

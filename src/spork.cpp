@@ -78,6 +78,8 @@ void ProcessSpork(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
             it++;
         }
     }
+    
+    MilliSleep(5); /* RGP Optimise */
 
 }
 
@@ -86,9 +88,12 @@ bool IsSporkActive(int nSporkID)
 {
     int64_t r = -1;
 
-    if(mapSporksActive.count(nSporkID)){
+    if(mapSporksActive.count(nSporkID))
+    {
         r = mapSporksActive[nSporkID].nValue;
-    } else {
+    } 
+    else
+    {
         if(nSporkID == SPORK_1_MASTERNODE_PAYMENTS_ENFORCEMENT) r = SPORK_1_MASTERNODE_PAYMENTS_ENFORCEMENT_DEFAULT;
         if(nSporkID == SPORK_2_INSTANTX) r = SPORK_2_INSTANTX_DEFAULT;
         if(nSporkID == SPORK_3_INSTANTX_BLOCK_FILTERING) r = SPORK_3_INSTANTX_BLOCK_FILTERING_DEFAULT;
@@ -106,6 +111,8 @@ bool IsSporkActive(int nSporkID)
     }
     if(r == -1) r = 4070908800; //return 2099-1-1 by default
 
+    MilliSleep(5); /* RGP Optimise */
+    
     return r < GetTime();
 }
 
@@ -236,6 +243,7 @@ void CSporkManager::Relay(CSporkMessage& msg)
     CInv inv(MSG_SPORK, msg.GetHash());
 
     RelayInventory(inv);
+    MilliSleep(5); /* RGP Optimise */
 }
 
 bool CSporkManager::SetPrivKey(std::string strPrivKey)

@@ -66,6 +66,7 @@ bool AppInit(int argc, char* argv[])
     fHaveGUI = false;
     try
     {
+
         //
         // Parameters
         //
@@ -124,7 +125,7 @@ LogPrintf("RGP DEBUG Bitcoind.cpp 007 \n");
 #if !WIN32
 
 LogPrintf("RGP DEBUG Bitcoind.cpp 010 \n");
-        fDaemon = GetBoolArg("-daemon", false);
+        fDaemon = GetBoolArg("daemon", false);
         if (fDaemon)
         {
             // Daemonize
@@ -156,7 +157,12 @@ LogPrintf("RGP DEBUG Bitcoind.cpp 010 \n");
 
         fRet = AppInit2(threadGroup);
 
+        MilliSleep( 1000 );
+
         LogPrintf("*** RGP AppINit2 after init returned \n");
+LogPrintf("RGP DEBUG Bitcoind.cpp 001.1 \n");
+        Read_MN_Config();
+LogPrintf("RGP DEBUG Bitcoind.cpp 001.2 \n");
 
     }
     catch (std::exception& e) {

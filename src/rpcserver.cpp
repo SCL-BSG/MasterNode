@@ -320,28 +320,29 @@ UniValue stop(const UniValue& params, bool fHelp)
  */
 static const CRPCCommand vRPCCommands[] =
     {
-        //  category		name			actor (function)	okSafeMode	threadSafe	reqWallet
-        //  ----------------	----------------- 	-------------------    ---------- 	---------- 	---------
+        //  category		    name			        actor (function)	   okSafeMode	threadSafe	reqWallet
+        //  ----------------	----------------- 	    -------------------    ---------- 	---------- 	---------
         /* Overall control/query calls */
         
-        { "control",		"help",		&help,			true,		true,		false		},
-        { "control",		"getinfo",		&getinfo,		true,		true,		false		}, /* uses wallet if enabled */
-        { "control",		"stop",		&stop,			true,		true,		false		},
+        { "control",		    "help",		            &help,			       true,		true,		false		},
+        { "control",		    "getinfo",		        &getinfo,		       true,		true,		false		}, /* uses wallet if enabled */
+        { "control",		    "stop",		            &stop,			       true,		true,		false		},
         
          /* Block chain and UTXO */
 
-        {"blockchain",          "getblockchaininfo", &getblockchaininfo, true, false, false},
-        {"blockchain",          "getbestblockhash", &getbestblockhash, true, false, false},
-        {"blockchain",		"getblockcount", 	&getblockcount, 	true, 		false, 	false		},
-        {"blockchain",          "getblock",      &getblock, 			true, 		false, 	false		},
-        {"blockchain", 	"getblockhash",   &getblockhash, 		true, 		false, 	false		},
-        {"blockchain",         "getchaintips",   &getchaintips, 		true, 		false, 	false		},	
+        {"blockchain",          "getblockchaininfo",    &getblockchaininfo,    true,        false,      false       },
+        {"blockchain",          "getbestblockhash",     &getbestblockhash,     true,        false,      false       },
+        {"blockchain",		    "getblockcount", 	    &getblockcount, 	   true, 		false, 	    false		},
+        {"blockchain",          "getblock",             &getblock, 		       true, 		false, 	    false		},
+        {"blockchain", 	        "getblockhash",         &getblockhash, 		   true, 		false, 	    false		},
+        {"blockchain",          "getchaintips",         &getchaintips, 		   true, 		false, 	    false		},	
 
-        {"blockchain", 	"getdifficulty", &getdifficulty, true, false, false},
-        {"blockchain", 	"getrawmempool", 	&getrawmempool, 	true, 		false, 	false		},
+        {"blockchain", 	        "getdifficulty",        &getdifficulty,        true,        false,      false       },
+        {"blockchain", 	        "getrawmempool", 	    &getrawmempool, 	   true, 		false, 	    false		},
 
-        {"blockchain", 	"getblockbynumber",	&getblockbynumber,	false,    	false,     	false 		},
-        {"blockchain",		"getcheckpoint",	&getcheckpoint,         true,      	false,     	false		},
+        {"blockchain", 	        "getblockbynumber",	    &getblockbynumber,	   true,    	false,     	false 		},
+        {"blockchain",          "gettransaction",       &gettransaction,       true,        true,       false       },
+        {"blockchain",		    "getcheckpoint",	    &getcheckpoint,        true,      	false,     	false		},
 
         
 #ifdef ENABLE_WALLET
@@ -472,7 +473,7 @@ static const CRPCCommand vRPCCommands[] =
     { "Wallet_enabled","sendmany",               &sendmany,               false,     false,     true },
     { "Wallet_enabled","addmultisigaddress",     &addmultisigaddress,     false,     false,     true },
     { "Wallet_enabled","addredeemscript",        &addredeemscript,        false,     false,     true },
-    { "Wallet_enabled","gettransaction",         &gettransaction,         false,     false,     true },
+    { "Wallet_enabled","gettransaction",         &gettransaction,         true,      true,      false },
     { "Wallet_enabled","listtransactions",       &listtransactions,       false,     false,     true },
     { "Wallet_enabled","listaddressgroupings",   &listaddressgroupings,   false,     false,     true },
     { "Wallet_enabled","signmessage",            &signmessage,            false,     false,     true },
@@ -585,52 +586,52 @@ static const CRPCCommand vRPCCommands[] =
 
 #ifdef ENABLE_WALLET
         /* Wallet */
-        {"wallet", "addmultisigaddress", &addmultisigaddress, true, false, true},
+//        {"wallet", "addmultisigaddress", &addmultisigaddress, true, false, true},
 //        {"wallet", "autocombinerewards", &autocombinerewards, false, false, true},
-        {"wallet", "backupwallet", &backupwallet, true, false, true},
-        {"wallet", "dumpprivkey", &dumpprivkey, true, false, true},
-        {"wallet", "dumpwallet", &dumpwallet, true, false, true},
-        {"wallet", "encryptwallet", &encryptwallet, true, false, true},
-        {"wallet", "getaccountaddress", &getaccountaddress, true, false, true},
-        {"wallet", "getaccount", &getaccount, true, false, true},
-        {"wallet", "getaddressesbyaccount", &getaddressesbyaccount, true, false, true},
-        {"wallet", "getbalance", &getbalance, false, false, true},
-        {"wallet", "getnewaddress", &getnewaddress, true, false, true},
+//        {"wallet", "backupwallet", &backupwallet, true, false, true},
+//        {"wallet", "dumpprivkey", &dumpprivkey, true, false, true},
+//        {"wallet", "dumpwallet", &dumpwallet, true, false, true},
+//        {"wallet", "encryptwallet", &encryptwallet, true, false, true},
+//        {"wallet", "getaccountaddress", &getaccountaddress, true, false, true},
+//        {"wallet", "getaccount", &getaccount, true, false, true},
+//        {"wallet", "getaddressesbyaccount", &getaddressesbyaccount, true, false, true},
+//        {"wallet", "getbalance", &getbalance, false, false, true},
+//        {"wallet", "getnewaddress", &getnewaddress, true, false, true},
 //        {"wallet", "getrawchangeaddress", &getrawchangeaddress, true, false, true},
-        {"wallet", "getreceivedbyaccount", &getreceivedbyaccount, false, false, true},
-        {"wallet", "getreceivedbyaddress", &getreceivedbyaddress, false, false, true},
+//        {"wallet", "getreceivedbyaccount", &getreceivedbyaccount, false, false, true},
+//        {"wallet", "getreceivedbyaddress", &getreceivedbyaddress, false, false, true},
 //        {"wallet", "getstakingstatus", &getstakingstatus, false, false, true},
 //        {"wallet", "getstakesplitthreshold", &getstakesplitthreshold, false, false, true},
-        {"wallet", "gettransaction", &gettransaction, false, false, true},
+//        {"wallet", "gettransaction", &gettransaction, true, false, true},
 //        {"wallet", "getunconfirmedbalance", &getunconfirmedbalance, false, false, true},
 //        {"wallet", "getwalletinfo", &getwalletinfo, false, false, true},
-        {"wallet", "importprivkey", &importprivkey, true, false, true},
-        {"wallet", "importwallet", &importwallet, true, false, true},
-        {"wallet", "importaddress", &importaddress, true, false, true},
-        {"wallet", "keypoolrefill", &keypoolrefill, true, false, true},
-        {"wallet", "listaccounts", &listaccounts, false, false, true},
-        {"wallet", "listaddressgroupings", &listaddressgroupings, false, false, true},
+//        {"wallet", "importprivkey", &importprivkey, true, false, true},
+//        {"wallet", "importwallet", &importwallet, true, false, true},
+//        {"wallet", "importaddress", &importaddress, true, false, true},
+//        {"wallet", "keypoolrefill", &keypoolrefill, true, false, true},
+//        {"wallet", "listaccounts", &listaccounts, false, false, true},
+//        {"wallet", "listaddressgroupings", &listaddressgroupings, false, false, true},
 //        {"wallet", "listlockunspent", &listlockunspent, false, false, true},
-        {"wallet", "listreceivedbyaccount", &listreceivedbyaccount, false, false, true},
-        {"wallet", "listreceivedbyaddress", &listreceivedbyaddress, false, false, true},
-        {"wallet", "listsinceblock", &listsinceblock, false, false, true},
-        {"wallet", "listtransactions", &listtransactions, false, false, true},
-        {"wallet", "listunspent", &listunspent, false, false, true},
+//        {"wallet", "listreceivedbyaccount", &listreceivedbyaccount, false, false, true},
+//        {"wallet", "listreceivedbyaddress", &listreceivedbyaddress, false, false, true},
+//        {"wallet", "listsinceblock", &listsinceblock, false, false, true},
+//        {"wallet", "listtransactions", &listtransactions, false, false, true},
+//        {"wallet", "listunspent", &listunspent, false, false, true},
 //        {"wallet", "lockunspent", &lockunspent, true, false, true},
-        {"wallet", "move", &movecmd, false, false, true},
+//        {"wallet", "move", &movecmd, false, false, true},
 //        {"wallet", "multisend", &multisend, false, false, true},
-        {"wallet", "sendfrom", &sendfrom, false, false, true},
-        {"wallet", "sendmany", &sendmany, false, false, true},
-        {"wallet", "sendtoaddress", &sendtoaddress, false, false, true},
+//        {"wallet", "sendfrom", &sendfrom, false, false, true},
+//        {"wallet", "sendmany", &sendmany, false, false, true},
+//        {"wallet", "sendtoaddress", &sendtoaddress, false, false, true},
 //        {"wallet", "sendtoaddressix", &sendtoaddressix, false, false, true},
 //        {"wallet", "burncoins", &burncoins, false, false, true},
-        {"wallet", "setaccount", &setaccount, true, false, true},
+//        {"wallet", "setaccount", &setaccount, true, false, true},
 //        {"wallet", "setstakesplitthreshold", &setstakesplitthreshold, false, false, true},
-        {"wallet", "settxfee", &settxfee, true, false, true},
-        {"wallet", "signmessage", &signmessage, true, false, true},
-        {"wallet", "walletlock", &walletlock, true, false, true},
-        {"wallet", "walletpassphrasechange", &walletpassphrasechange, true, false, true},
-        {"wallet", "walletpassphrase", &walletpassphrase, true, false, true},
+//        {"wallet", "settxfee", &settxfee, true, false, true},
+//        {"wallet", "signmessage", &signmessage, true, false, true},
+//        {"wallet", "walletlock", &walletlock, true, false, true},
+//        {"wallet", "walletpassphrasechange", &walletpassphrasechange, true, false, true},
+//        {"wallet", "walletpassphrase", &walletpassphrase, true, false, true},
 
 
 #endif // ENABLE_WALLET
@@ -781,6 +782,8 @@ std::string JSONRPCExecBatch(const UniValue& vReq)
 UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &params) const
 {
 
+LogPrintf("RGP DEBUG CRPCTable::execute %s \n", strMethod );
+
     // Find method
     const CRPCCommand* pcmd = tableRPC[strMethod];
     if (!pcmd)
@@ -792,7 +795,7 @@ UniValue CRPCTable::execute(const std::string &strMethod, const UniValue &params
         // Execute
 
 // 
-// Note the reurn of getinfo is retuned back to HTTPReq_JSONRPC() in httprpc.cpp
+// Note the return of getinfo is retuned back to HTTPReq_JSONRPC() in httprpc.cpp
 //
         return pcmd->actor(params, false);
     } catch (std::exception& e) 

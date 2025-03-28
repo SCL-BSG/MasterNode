@@ -24,6 +24,9 @@
 #include <signal.h>
 #include <future>
 
+/* RGP fix for queue error Feb 2025 */
+#include <deque>
+
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/thread.h>
@@ -208,8 +211,8 @@ static bool InitHTTPAllowList()
     rpc_allow_subnets.clear();
     rpc_allow_subnets.push_back(CSubNet("127.0.0.0/8")); // always allow IPv4 local subnet
     rpc_allow_subnets.push_back(CSubNet("::1"));         // always allow IPv6 localhost
-    if (mapMultiArgs.count("-rpcallowip")) {
-        const std::vector<std::string>& vAllow = mapMultiArgs["-rpcallowip"];
+    if (mapMultiArgs.count("rpcallowip")) {
+        const std::vector<std::string>& vAllow = mapMultiArgs["rpcallowip"];
         for (std::string strAllow : vAllow) {
             CSubNet subnet(strAllow);
             if (!subnet.IsValid()) {
@@ -322,18 +325,18 @@ static bool ThreadHTTP(struct event_base* base, struct evhttp* http)
 /** Bind HTTP server to specified addresses */
 static bool HTTPBindAddresses(struct evhttp* http)
 {
-    int defaultPort = GetArg("-rpcport", 23980 );
+    int defaultPort = GetArg("rpcport", 23980 );
     std::vector<std::pair<std::string, uint16_t> > endpoints;
 
     // Determine what addresses to bind to
-    if (!mapArgs.count("-rpcallowip")) { // Default to loopback if not allowing external IPs
+    if (!mapArgs.count("rpcallowip")) { // Default to loopback if not allowing external IPs
         endpoints.push_back(std::make_pair("::1", defaultPort));
         endpoints.push_back(std::make_pair("127.0.0.1", defaultPort));
-        if (mapArgs.count("-rpcbind")) {
+        if (mapArgs.count("rpcbind")) {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
         }
-    } else if (mapArgs.count("-rpcbind")) { // Specific bind address
-        const std::vector<std::string>& vbind = mapMultiArgs["-rpcbind"];
+    } else if (mapArgs.count("rpcbind")) { // Specific bind address
+        const std::vector<std::string>& vbind = mapMultiArgs["rpcbind"];
         for (std::vector<std::string>::const_iterator i = vbind.begin(); i != vbind.end(); ++i) {
             int port = defaultPort;
             std::string host;
@@ -387,7 +390,7 @@ bool InitHTTPServer()
     if (!InitHTTPAllowList())
         return false;
 
-    if (GetBoolArg("-rpcssl", false)) {
+    if (GetBoolArg("rpcssl", false)) {
         uiInterface.ThreadSafeMessageBox(
             "SSL mode for RPC (-rpcssl) is no longer supported.",
             "", CClientUIInterface::MSG_ERROR);
@@ -424,7 +427,7 @@ bool InitHTTPServer()
         return false;
     }
 
-    evhttp_set_timeout(http, GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
+    evhttp_set_timeout(http, GetArg("rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
     evhttp_set_max_body_size(http, MAX_SIZE);
     
@@ -441,7 +444,7 @@ bool InitHTTPServer()
     }
 
     LogPrintf("http, Initialized HTTP server\n");
-    int workQueueDepth = std::max((long)GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
+    int workQueueDepth = std::max((long)GetArg("rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
     LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
 
     workQueue = new WorkQueue<HTTPClosure>(workQueueDepth);
@@ -458,7 +461,7 @@ bool StartHTTPServer()
 
     LogPrintf("http, Starting HTTP server\n");
     
-    int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
+    int rpcThreads = std::max((long)GetArg("rpcthreads", DEFAULT_HTTP_THREADS), 1L);
 
     std::packaged_task<bool(event_base*, evhttp*)> task(ThreadHTTP);
 

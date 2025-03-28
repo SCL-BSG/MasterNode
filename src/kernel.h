@@ -1,10 +1,12 @@
 // Copyright (c) 2012-2013 The PPCoin developers
+// Copyright (C) 2024 Bank Society Gold Coin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef PPCOIN_KERNEL_H
-#define PPCOIN_KERNEL_H
+#ifndef BSG_COIN_KERNEL_H
+#define BSG_COIN_KERNEL_H
 
 #include "main.h"
+#include "stakeinput.h"
 
 // To decrease granularity of timestamp
 // Supposed to be 2^n-1
@@ -28,6 +30,8 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, unsigned 
 // Sets hashProofOfStake on success return
 bool CheckProofOfStake(CBlockIndex* pindexPrev, const CTransaction& tx, unsigned int nBits, uint256& hashProofOfStake, uint256& targetProofOfStake);
 
+bool CheckProofOfStakeMod ( const CBlock block, uint256& hashProofOfStake, std::unique_ptr< CStakeInput >& stake );
+
 // Check whether the coinstake timestamp meets protocol
 bool CheckCoinStakeTimestamp(int nHeight, int64_t nTimeBlock, int64_t nTimeTx);
 
@@ -39,4 +43,4 @@ int64_t GetWeight(int64_t nIntervalBeginning, int64_t nIntervalEnd);
 // Convenient for searching a kernel
 bool CheckKernel(CBlockIndex* pindexPrev, unsigned int nBits, int64_t nTime, const COutPoint& prevout, int64_t* pBlockTime = NULL);
 
-#endif // PPCOIN_KERNEL_H
+#endif // BSG_COIN_KERNEL_H

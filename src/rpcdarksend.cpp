@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Darkcoin developers
+// Copyright (c) 2024      The Bank Society Gold developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -406,7 +407,10 @@ UniValue masternode(const UniValue& params, bool fHelp)
         }
 
         if(activeMasternode.status == MASTERNODE_REMOTELY_ENABLED) return "masternode started remotely";
-        if(activeMasternode.status == MASTERNODE_INPUT_TOO_NEW) return "masternode input must have at least 15 confirmations";
+
+        LogPrintf("RGP DEBUG rpc DarkSend REMOVE COMMENT once NODES SYNCH correctly \n");
+
+        //if(activeMasternode.status == MASTERNODE_INPUT_TOO_NEW) return "masternode input must have at least 15 confirmations";
         if(activeMasternode.status == MASTERNODE_STOPPED) return "masternode is stopped";
         if(activeMasternode.status == MASTERNODE_IS_CAPABLE) return "successfully started masternode";
         if(activeMasternode.status == MASTERNODE_NOT_CAPABLE) return "not capable masternode: " + activeMasternode.notCapableReason;

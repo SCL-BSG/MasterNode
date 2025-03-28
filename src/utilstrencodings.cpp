@@ -16,7 +16,10 @@ using namespace std;
 
 
 
-void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
+void SplitHostPort(std::string in, int &portOut, std::string &hostOut) 
+{
+   printf("RGP Debug SplitHostPort In %s Port %d  HostOut %s \n", in, portOut hostOut    );  
+
     size_t colon = in.find_last_of(':');
     // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
     bool fHaveColon = colon != in.npos;

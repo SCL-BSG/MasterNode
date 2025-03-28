@@ -1100,6 +1100,8 @@ bool ConnectSocketByName(CService& addr, SOCKET& hSocketRet, const char* pszDest
     string strDest;
     int port = portDefault;
 
+    LogPrintf("RGP ConnectSocketByName start with %s timeout %d  \n", pszDest, nTimeout );
+
     if (outProxyConnectionFailed)
         *outProxyConnectionFailed = false;
 
@@ -1108,16 +1110,24 @@ bool ConnectSocketByName(CService& addr, SOCKET& hSocketRet, const char* pszDest
     proxyType nameProxy;
     GetNameProxy(nameProxy);
 
+    LogPrintf("RGP ConnectSocketByName Debug 001  \n");
+
     CService addrResolved(CNetAddr(strDest, fNameLookup && !HaveNameProxy()), port);
-    if (addrResolved.IsValid()) {
+    if (addrResolved.IsValid()) 
+    {
         addr = addrResolved;
         return ConnectSocket(addr, hSocketRet, nTimeout);
     }
+
+ LogPrintf("RGP ConnectSocketByName Debug 002  \n");
 
     addr = CService("0.0.0.0:0");
 
     if (!HaveNameProxy())
         return false;
+
+     LogPrintf("RGP ConnectSocketByName Debug 003  \n");
+
     return ConnectThroughProxy(nameProxy, strDest, port, hSocketRet, nTimeout, outProxyConnectionFailed);
 }
 

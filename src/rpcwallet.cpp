@@ -31,13 +31,13 @@ extern UniValue ValueFromAmount(const CAmount& amount);
 
 static void accountingDeprecationCheck()
 {
-    if (!GetBoolArg("-enableaccounts", false))
+    if (!GetBoolArg("enableaccounts", false))
         throw runtime_error(
             "Accounting API is deprecated and will be removed in future.\n"
             "It can easily result in negative or odd balances if misused or misunderstood, which has happened in the field.\n"
             "If you still want to enable it, add to your config file enableaccounts=1\n");
 
-    if (GetBoolArg("-staking", true))
+    if (GetBoolArg("staking", true))
         throw runtime_error("If you want to use accounting API, staking must be disabled, add to your config file staking=0\n");
 }
 
@@ -1836,8 +1836,12 @@ UniValue gettransaction(const UniValue& params, bool fHelp)
             + HelpExampleRpc("gettransaction", "\"1075db55d416d3ca199f55b6084e2115b9345e16c5cf302fc80e9d5fbf5d48d\"")
         );
 
+LogPrintf("RGP RPCWALLET gettransaction \n" );
+
     uint256 hash;
     hash.SetHex(params[0].get_str());
+
+LogPrintf("RGP RPCWALLET gettransaction hash parameter %s \n", hash.ToString() );
 
     isminefilter filter = ISMINE_SPENDABLE;
     if(params.size() > 1)
@@ -1847,55 +1851,79 @@ UniValue gettransaction(const UniValue& params, bool fHelp)
     UniValue entry(UniValue::VOBJ);
     //Object entry;
 
+
+LogPrintf("RGP RPCWALLET gettransaction Debug 001 \n" );
     if (pwalletMain->mapWallet.count(hash))
     {
         const CWalletTx& wtx = pwalletMain->mapWallet[hash];
-
+LogPrintf("RGP RPCWALLET gettransaction Debug 010 \n" );
         TxToJSON(wtx, 0, entry);
 
         int64_t nCredit = wtx.GetCredit(filter);
         int64_t nDebit = wtx.GetDebit(filter);
         int64_t nNet = nCredit - nDebit;
         int64_t nFee = (wtx.IsFromMe(filter) ? wtx.GetValueOut() - nDebit : 0);
-
+LogPrintf("RGP RPCWALLET gettransaction Debug 020 \n" );
         entry.push_back(Pair("amount", ValueFromAmount(nNet - nFee)));
         if (wtx.IsFromMe(filter))
             entry.push_back(Pair("fee", ValueFromAmount(nFee)));
-
+LogPrintf("RGP RPCWALLET gettransaction Debug 030 \n" );
         WalletTxToJSON(wtx, entry);
-
+LogPrintf("RGP RPCWALLET gettransaction Debug 040 \n" );
         UniValue details(UniValue::VARR);
         //Array details;
         ListTransactions(pwalletMain->mapWallet[hash], "*", 0, false, details, filter);
         entry.push_back(Pair("details", details));
+LogPrintf("RGP RPCWALLET gettransaction Debug 050 \n" );
     }
     else
     {
+
+LogPrintf("RGP RPCWALLET gettransaction Debug 060 \n" );
         CTransaction tx;
         uint256 hashBlock = 0;
         if (GetTransaction(hash, tx, hashBlock))
         {
+
+LogPrintf("RGP RPCWALLET gettransaction Debug 100 \n" );
+
             TxToJSON(tx, 0, entry);
+LogPrintf("RGP RPCWALLET gettransaction Debug 110 \n" );
+
+
             if (hashBlock == 0)
+            {
+LogPrintf("RGP RPCWALLET gettransaction Debug 120 \n" );
                 entry.push_back(Pair("confirmations", 0));
+            }
             else
             {
+LogPrintf("RGP RPCWALLET gettransaction Debug 130 \n" );
+
                 entry.push_back(Pair("blockhash", hashBlock.GetHex()));
+
+LogPrintf("RGP RPCWALLET gettransaction Debug 140 \n" );
                 map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
                 if (mi != mapBlockIndex.end() && (*mi).second)
                 {
+LogPrintf("RGP RPCWALLET gettransaction Debug 150 \n" );
                     CBlockIndex* pindex = (*mi).second;
                     if (pindex->IsInMainChain())
                         entry.push_back(Pair("confirmations", 1 + nBestHeight - pindex->nHeight));
                     else
                         entry.push_back(Pair("confirmations", 0));
                 }
+LogPrintf("RGP RPCWALLET gettransaction Debug 160 \n" );
             }
         }
         else
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
+        {
+            LogPrintf("RGP RPCWALLET gettransaction Debug 170 no transaction \n" );
+            entry.push_back(Pair("confirmations", 0));
+            // throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available about transaction");
+        }
     }
-
+LogPrintf("RGP RPCWALLET gettransaction Debug 180 \n" );
     return entry;
 }
 
@@ -1935,13 +1963,13 @@ UniValue keypoolrefill(const UniValue& params, bool fHelp)
             + HelpExampleRpc("keypoolrefill", "")
         );
 
-    fLiteMode = GetBoolArg("-litemode", false);
+    fLiteMode = GetBoolArg("litemode", false);
     unsigned int nSize;
 
     if (fLiteMode)
-        nSize = max(GetArg("-keypool", 100), (int64_t)0);
+        nSize = max(GetArg("keypool", 100), (int64_t)0);
     else
-        nSize = max(GetArg("-keypool", 10), (int64_t)0);
+        nSize = max(GetArg("keypool", 10), (int64_t)0);
 
     if (params.size() > 0) {
         if (params[0].get_int() < 0)

@@ -94,6 +94,7 @@ void ProcessMessageMasternodePayments(CNode* pfrom, std::string& strCommand, CDa
             masternodePayments.Relay(winner);
         }
     }
+    MilliSleep(5); /* RGP Optimise */
 
 }
 
@@ -114,6 +115,7 @@ bool CMasternodePayments::CheckSignature(CMasternodePaymentWinner& winner)
         return false;
     }
 
+    MilliSleep(5); /* RGP Optimise */
     return true;
 }
 
@@ -152,8 +154,8 @@ bool CMasternodePayments::Sign(CMasternodePaymentWinner& winner)
 
     std::string debug_Message = winner.vin.ToString().c_str();    
 
-    //LogPrintf("*** RGP CMasternodePayments::Sign winner vin  %s \n", debug_Message );
-    //LogPrintf("*** RGP CMasternodePayments::Sign Private Key <%s>  \n", strMessage );
+    LogPrintf("*** RGP CMasternodePayments::Sign winner vin  %s \n", debug_Message );
+    LogPrintf("*** RGP CMasternodePayments::Sign Private Key <%s>  \n", strMessage );
 
     //if(!darkSendSigner.SetKey(strMasterPrivKey, errorMessage, key2, pubkey2))
     if(!darkSendSigner.SetKey(strMessage, errorMessage, key2, pubkey2))
@@ -174,7 +176,7 @@ bool CMasternodePayments::Sign(CMasternodePaymentWinner& winner)
         LogPrintf("CMasternodePayments::Sign - Verify message failed");
         return false;
     }
-
+    MilliSleep(5); /* RGP Optimise */
     return true;
 }
 
@@ -195,13 +197,15 @@ uint64_t CMasternodePayments::CalculateScore(uint256 blockHash, CTxIn& vin)
 bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee, CTxIn& vin)
 {
 
-    BOOST_FOREACH( CMasternodePaymentWinner& winner, vWinning ){
+    BOOST_FOREACH( CMasternodePaymentWinner& winner, vWinning )
+    {
 
         if(winner.nBlockHeight == nBlockHeight) {
             payee = winner.payee;
             vin = winner.vin;
             return true;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return false;
@@ -209,11 +213,13 @@ bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee, CTxIn&
 
 bool CMasternodePayments::GetWinningMasternode(int nBlockHeight, CTxIn& vinOut)
 {
-    BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning){
+    BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning)
+    {
         if(winner.nBlockHeight == nBlockHeight) {
             vinOut = winner.vin;
             return true;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return false;
@@ -247,6 +253,7 @@ bool CMasternodePayments::AddWinningMasternode(CMasternodePaymentWinner& winnerI
                 return true;
             }
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     // if it's not in the vector
@@ -269,12 +276,14 @@ void CMasternodePayments::CleanPaymentList()
     int nLimit = std::max(((int)mnodeman.size())*((int)1.25), 1000);
 
     vector<CMasternodePaymentWinner>::iterator it;
-    for(it=vWinning.begin();it<vWinning.end();it++){
+    for(it=vWinning.begin();it<vWinning.end();it++)
+    {
         if(pindexBest->nHeight - (*it).nBlockHeight > nLimit){
             if(fDebug) LogPrintf("CMasternodePayments::CleanPaymentList - Removing old Masternode payment - block %d\n", (*it).nBlockHeight);
             vWinning.erase(it);
             break;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 }
 
@@ -283,13 +292,11 @@ uint256 hashkeygen;
 
 bool CMasternodePayments::ProcessBlock(int nBlockHeight)
 {
-    bool key_status;
-    uint256 hash;
-    extern uint256 hashkeygen;
-    unsigned int nHash;
-    int nMinimumAge;
-
-
+bool key_status;
+uint256 hash;
+extern uint256 hashkeygen;
+unsigned int nHash;
+int nMinimumAge;
 
     //LogPrintf("*** RGP CMasternodePayments::ProcessBlock Start \n");
 
@@ -352,8 +359,8 @@ bool CMasternodePayments::ProcessBlock(int nBlockHeight)
         if(vecLastPayments.size() > (unsigned int)nMinimumAge) break;
         vecLastPayments.push_back(winner.vin);
 
-
-
+	MilliSleep(1); /* RGP Optimise */
+	
     }
 
     int vsigcheck;
@@ -469,7 +476,11 @@ bool CMasternodePayments::ProcessBlock(int nBlockHeight)
                 break; // we found active MN
             }
             else
+            {
                 LogPrintf("*** RGP, mno valid MN found Yet \n" );
+            }   
+            MilliSleep(1); /* RGP Optimise */
+            
         }
     }
 
@@ -513,7 +524,8 @@ bool CMasternodePayments::ProcessBlock(int nBlockHeight)
             return true;
         }
     }
-
+    MilliSleep(5); /* RGP Optimise */
+    
     return false;
 }
 
@@ -531,6 +543,7 @@ void CMasternodePayments::Relay(CMasternodePaymentWinner& winner)
     {
         pnode->PushMessage("inv", vInv);
         //LogPrintf("*** Relay to Nodes %s \n", pnode->addr.ToString() );
+        MilliSleep(1); /* RGP Optimise */
     }
 }
 
@@ -546,6 +559,7 @@ void CMasternodePayments::Sync(CNode* node)
         {
             node->PushMessage("mnw", winner);
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 }
 
@@ -555,14 +569,14 @@ bool CMasternodePayments::SetPrivKey(std::string strPrivKey)
     CMasternodePaymentWinner winner;
 
     // Test signing successful, proceed
-    //LogPrintf("*** RGP, CMasternodePayments::SetPrivKey of MN <%s>  \n", strPrivKey );
+    LogPrintf("*** RGP, CMasternodePayments::SetPrivKey of MN <%s>  \n", strPrivKey );
 
     strMasterPrivKey = strPrivKey;
 
     Sign(winner);
 
     if(CheckSignature(winner)){
-        LogPrintf("CMasternodePayments::SetPrivKey - Successfully initialized as Masternode payments master\n");
+        LogPrintf("CMasternodePayments::SetPrivKey - Successfully initialized as Masternode payments master %s \n", strMasterPrivKey );
         enabled = true;
         return true;
     } else {

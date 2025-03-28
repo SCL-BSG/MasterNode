@@ -134,8 +134,8 @@ static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 
-inline unsigned int ReceiveFloodSize() { return 1000*GetArg("-maxreceivebuffer", 5*1000); }
-inline unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }
+inline unsigned int ReceiveFloodSize() { return 1000*GetArg("maxreceivebuffer", 5*1000); }
+inline unsigned int SendBufferSize() { return 1000*GetArg("maxsendbuffer", 1*1000); }
 
 void AddOneShot(std::string strDest);
 bool RecvLine(SOCKET hSocket, std::string& strLine);
@@ -810,7 +810,7 @@ public:
         // The -*messagestest options are intentionally not documented in the help message,
         // since they are only used during development to debug the networking code and are
         // not intended for end-users.
-        if (mapArgs.count("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 2)) == 0)
+        if (mapArgs.count("dropmessagestest") && GetRand(GetArg("dropmessagestest", 2)) == 0)
         {
             LogPrint("net", "dropmessages DROPPING SEND MESSAGE\n");
             AbortMessage();

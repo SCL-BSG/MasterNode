@@ -226,8 +226,23 @@ bool CTxDB::ReadAddrIndex(uint160 addrHash, std::vector<uint256>& txHashes)
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex& txindex)
 {
+LogPrintf("RGP CTxDB::ReadTxIndex Start hash %s \n", hash.ToString() );
+
     txindex.SetNull();
-    return Read(make_pair(string("tx"), hash), txindex);
+    
+//LogPrintf("RGP CTxDB::ReadTxIndex Debug 100 \n");
+
+    if ( Read(make_pair(string("tx"), hash), txindex) )
+    {
+//LogPrintf("RGP CTxDB::ReadTxIndex Debug 110 SUCCESS \n");
+       return true;
+    }
+    else
+    {
+LogPrintf("RGP CTxDB::ReadTxIndex Debug 120 FAIL \n");
+       return false;
+    }
+    
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex& txindex)
@@ -459,7 +474,10 @@ bool CTxDB::LoadBlockIndex()
         boost::this_thread::interruption_point();
         if (pindex->nHeight < nBestHeight-nCheckDepth)
             break;
+
+        // RGP, new creation in loop
         CBlock block;
+
         if (!block.ReadFromDisk(pindex))
             return error("LoadBlockIndex() : block.ReadFromDisk failed");
         // check level 1: verify block validity
@@ -474,6 +492,9 @@ bool CTxDB::LoadBlockIndex()
         {
             pair<unsigned int, unsigned int> pos = make_pair(pindex->nFile, pindex->nBlockPos);
             mapBlockPos[pos] = pindex;
+
+            // RGP, process block transactions
+
             BOOST_FOREACH(const CTransaction &tx, block.vtx)
             {
                 uint256 hashTx = tx.GetHash();
@@ -529,8 +550,11 @@ bool CTxDB::LoadBlockIndex()
                                     {
                                         bool fFound = false;
                                         BOOST_FOREACH(const CTxIn &txin, txSpend.vin)
+                                        {
                                             if (txin.prevout.hash == hashTx && txin.prevout.n == nOutput)
                                                 fFound = true;
+                                            MilliSleep(1);
+                                        }
                                         if (!fFound)
                                         {
                                             LogPrintf("LoadBlockIndex(): *** spending transaction of %s:%i does not spend it\n", hashTx.ToString(), nOutput);
@@ -540,6 +564,7 @@ bool CTxDB::LoadBlockIndex()
                                 }
                             }
                             nOutput++;
+                            MilliSleep(5);
                         }
                     }
                 }
@@ -550,11 +575,14 @@ bool CTxDB::LoadBlockIndex()
                      {
                           CTxIndex txindex;
                           if (ReadTxIndex(txin.prevout.hash, txindex))
+                          {
                               if (txindex.vSpent.size()-1 < txin.prevout.n || txindex.vSpent[txin.prevout.n].IsNull())
                               {
                                   LogPrintf("LoadBlockIndex(): *** found unspent prevout %s:%i in %s\n", txin.prevout.hash.ToString(), txin.prevout.n, hashTx.ToString());
                                   pindexFork = pindex->pprev;
                               }
+                          }
+                          MilliSleep(1);
                      }
                 }
             }

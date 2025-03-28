@@ -38,7 +38,6 @@ SECP256K1_INCLUDE_PATH = /home/robert/Bank-Society-Gold-main/src/secp256k1/inclu
 //UNIVALUE_INCLUDE_PATH = /home/bpickles/BSC_G/src/univalue/include
 
 
-
 USE_UPNP:=0
 USE_WALLET:=1
 USE_LOWMEM:=0
@@ -46,7 +45,7 @@ USE_LOWMEM:=0
 LINK:=$(CXX)
 ARCH:=$(system lscpu | head -n 1 | awk '{print $2}')
 
-DEFS=-DBOOST_SPIRIT_THREADSAFE
+DEFS= -DBOOST_SPIRIT_THREADSAFE -DBOOST_NO_CXX11_SCOPED_ENUMS -lboost_system -lboost_filesystem
 DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/obj $(addprefix -I,$(BOOST_INCLUDE_PATH)) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH)) $(addprefix -I,$(SECP256K1_INCLUDE_PATH)) $(addprefix -I,$(UNIVALUE_INCLUDE_PATH))
 LIBS = $(addprefix -L,$(BOOST_LIB_PATH) $(BDB_LIB_PATH) $(OPENSSL_LIB_PATH)) $(addprefix -L,$(LIBEVENT_LIB_PATH)) -L /usr/local/lib/libboost_chrono.so.1.82.0  
 
@@ -143,15 +142,17 @@ LIBS+= \
 DEBUGFLAGS=-g
 
 
-ifeq (${ARCH}, i686)
-    EXT_OPTIONS=-msse2
-endif
+
+CC=gcc
+CXX=g++
 
 
 # CXXFLAGS can be specified on the make command line, so we use xCXXFLAGS that only
 # adds some defaults in front. Unfortunately, CXXFLAGS=... $(CXXFLAGS) does not work.
 xCXXFLAGS= -O2 -std=c++11 $(EXT_OPTIONS) -pthread -Wall -Wextra -Wno-ignored-qualifiers -Wformat -Wformat-security -Wno-unused-parameter -Wunused-function -Wunused-variable -fpermissive -Wconversion-null\
     $(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
+#xCXXFLAGS= -O2 -std=c++1y $(EXT_OPTIONS) -pthread -Wall -Wextra -Wno-ignored-qualifiers -Wformat -Wformat-security -Wno-unused-parameter -Wunused-function -Wunused-variable -fpermissive -Wconversion-null\
+#    $(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
 
 # LDFLAGS can be specified on the make command line, so we use xLDFLAGS that only
 # adds some defaults in front. Unfortunately, LDFLAGS=... $(LDFLAGS) does not work.

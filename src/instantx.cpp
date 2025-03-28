@@ -68,6 +68,7 @@ void ProcessMessageInstantX(CNode* pfrom, std::string& strCommand, CDataStream& 
                 LogPrintf("ProcessMessageInstantX::txlreq - Invalid Script %s\n", tx.ToString().c_str());
                 return;
             }
+            MilliSleep(1); /* RGP Optimise */
         }
 
         int nBlockHeight = CreateNewLock(tx);
@@ -122,6 +123,7 @@ void ProcessMessageInstantX(CNode* pfrom, std::string& strCommand, CDataStream& 
                 if(!mapLockedInputs.count(in.prevout)){
                     mapLockedInputs.insert(make_pair(in.prevout, tx.GetHash()));
                 }
+                MilliSleep(1); /* Optimize */
             }
 
             // resolve conflicts
@@ -187,7 +189,8 @@ void ProcessMessageInstantX(CNode* pfrom, std::string& strCommand, CDataStream& 
 
         return;
     }
-
+    MilliSleep(5); /* RGP Optimise */
+    
      //LogPrintf("ProcessMessageInstantX END \n");
 
 }
@@ -204,9 +207,13 @@ bool IsIXTXValid(const CTransaction& txCollateral)
     bool missingTx = false;
 
     BOOST_FOREACH(const CTxOut o, txCollateral.vout)
+    {
         nValueOut += o.nValue;
+        MilliSleep(1); /* RGP Optimise */
+    }
 
-    BOOST_FOREACH(const CTxIn i, txCollateral.vin){
+    BOOST_FOREACH(const CTxIn i, txCollateral.vin)
+    {
         CTransaction tx2;
         uint256 hash;
         if(GetTransaction(i.prevout.hash, tx2, hash)){
@@ -216,6 +223,7 @@ bool IsIXTXValid(const CTransaction& txCollateral)
         } else{
             missingTx = true;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     if(nValueOut > GetSporkValue(SPORK_5_MAX_VALUE)*COIN){
@@ -239,7 +247,8 @@ bool IsIXTXValid(const CTransaction& txCollateral)
     }
 
     LogPrintf("*** RGP ProcessMessageInstantX::IsIXTXValid Good ending \n");
-
+    
+    MilliSleep(5); /* RGP Optimise */
     return true;
 }
 
@@ -255,6 +264,7 @@ int64_t CreateNewLock(CTransaction tx)
             LogPrintf("CreateNewLock - Transaction not found / too new: %d / %s\n", nTxAge, tx.GetHash().ToString().c_str());
             return 0;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     /*
@@ -326,7 +336,8 @@ void DoConsensusVote(CTransaction& tx, int64_t nBlockHeight)
     CInv inv(MSG_TXLOCK_VOTE, ctx.GetHash());
 
     RelayInventory(inv);
-
+    
+    MilliSleep(5); /* RGP Optimise */
 }
 
 //received a consensus vote
@@ -334,7 +345,6 @@ bool ProcessConsensusVote(CNode* pnode, CConsensusVote& ctx)
 {
 
     LogPrintf("*** RGP ProcessMessageInstantX::ProcessConsensusVote  \n");
-
 
     int n = mnodeman.GetMasternodeRank(ctx.vinMasternode, ctx.nBlockHeight, MIN_INSTANTX_PROTO_VERSION);
 
@@ -431,7 +441,7 @@ bool ProcessConsensusVote(CNode* pnode, CConsensusVote& ctx)
         return true;
     }
 
-
+    MilliSleep(5); /* RGP Optimise */
     return false;
 }
 
@@ -448,15 +458,19 @@ bool CheckForConflictingLocks(CTransaction& tx)
         Blocks could have been rejected during this time, which is OK. After they cancel out, the client will
         rescan the blocks and find they're acceptable and then take the chain with the most work.
     */
-    BOOST_FOREACH(const CTxIn& in, tx.vin){
-        if(mapLockedInputs.count(in.prevout)){
-            if(mapLockedInputs[in.prevout] != tx.GetHash()){
+    BOOST_FOREACH(const CTxIn& in, tx.vin)
+    {
+        if(mapLockedInputs.count(in.prevout))
+        {
+            if(mapLockedInputs[in.prevout] != tx.GetHash())
+            {
                 LogPrintf("InstantX::CheckForConflictingLocks - found two complete conflicting locks - removing both. %s %s", tx.GetHash().ToString().c_str(), mapLockedInputs[in.prevout].ToString().c_str());
                 if(mapTxLocks.count(tx.GetHash())) mapTxLocks[tx.GetHash()].nExpiration = GetTime();
                 if(mapTxLocks.count(mapLockedInputs[in.prevout])) mapTxLocks[mapLockedInputs[in.prevout]].nExpiration = GetTime();
                 return true;
             }
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return false;
@@ -468,10 +482,12 @@ int64_t GetAverageVoteTime()
     int64_t total = 0;
     int64_t count = 0;
 
-    while(it != mapUnknownVotes.end()) {
+    while(it != mapUnknownVotes.end()) 
+    {
         total+= it->second;
         count++;
         it++;
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return total / count;
@@ -487,7 +503,8 @@ void CleanTransactionLocksList()
 
     std::map<uint256, CTransactionLock>::iterator it = mapTxLocks.begin();
 
-    while(it != mapTxLocks.end()) {
+    while(it != mapTxLocks.end()) 
+    {
         if(GetTime() > it->second.nExpiration){ //keep them for an hour
             LogPrintf("Removing old transaction lock %s\n", it->second.txHash.ToString().c_str());
 
@@ -495,19 +512,26 @@ void CleanTransactionLocksList()
                 CTransaction& tx = mapTxLockReq[it->second.txHash];
 
                 BOOST_FOREACH(const CTxIn& in, tx.vin)
+                {
                     mapLockedInputs.erase(in.prevout);
+                    MilliSleep(1); /* RGP Optimise */
+                }
 
                 mapTxLockReq.erase(it->second.txHash);
                 mapTxLockReqRejected.erase(it->second.txHash);
 
                 BOOST_FOREACH(CConsensusVote& v, it->second.vecConsensusVotes)
+                {
                     mapTxLockVote.erase(v.GetHash());
+                    MilliSleep(1); /* RGP Optimise */
+                }
             }
 
             mapTxLocks.erase(it++);
         } else {
             it++;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
 }
@@ -543,6 +567,8 @@ bool CConsensusVote::SignatureValid()
         LogPrintf("InstantX::CConsensusVote::SignatureValid() - Verify message failed\n");
         return false;
     }
+
+    MilliSleep(5); /* RGP Optimise */
 
     return true;
 }
@@ -607,6 +633,7 @@ bool CTransactionLock::SignaturesValid()
             LogPrintf("CTransactionLock::SignaturesValid() - Signature not valid\n");
             return false;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
 
     return true;
@@ -631,10 +658,13 @@ int CTransactionLock::CountSignatures()
     if(nBlockHeight == 0) return -1;
 
     int n = 0;
-    BOOST_FOREACH(CConsensusVote v, vecConsensusVotes){
+    BOOST_FOREACH(CConsensusVote v, vecConsensusVotes)
+    {
         if(v.nBlockHeight == nBlockHeight){
             n++;
         }
+        MilliSleep(1); /* RGP Optimise */
     }
     return n;
 }
+

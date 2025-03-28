@@ -3,6 +3,7 @@
 // Copyright (c) 2009-2015 The Dash developers
 // Copyright (c) 2015-2018 The PIVX developers
 // Copyright (c) 2018 The Myce developers
+// Copyright (c) 2024 The Bank Society Gold developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -46,19 +47,19 @@ static void SetupCliArgs()
     const auto testnetBaseParams = CreateBaseChainParams(CBaseChainParams::TESTNET);
 
     gArgs.AddArg("-?", "This help message", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-conf=<file>", strprintf("Specify configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-datadir=<dir>", "Specify data directory", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-getinfo", "Get general information from the remote server. Note that unlike server-side RPC calls, the results of -getinfo is the result of multiple non-atomic requests. Some entries in the result may represent results from different states (e.g. wallet balance may be as of a different block from the chain state reported)", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-named", strprintf("Pass named instead of positional arguments (default: %s)", DEFAULT_NAMED), false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcclienttimeout=<n>", strprintf("Timeout in seconds during HTTP requests, or 0 for no timeout. (default: %d)", DEFAULT_HTTP_CLIENT_TIMEOUT), false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcconnect=<ip>", strprintf("Send commands to node running on <ip> (default: %s)", DEFAULT_RPCCONNECT), false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcpassword=<pw>", "Password for JSON-RPC connections", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcport=<port>", strprintf("Connect to JSON-RPC on <port> (default: %u or testnet: %u)", defaultBaseParams->RPCPort(), testnetBaseParams->RPCPort()), false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcuser=<user>", "Username for JSON-RPC connections", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcwait", "Wait for RPC server to start", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-rpcwallet=<walletname>", "Send RPC for non-default wallet on RPC server (needs to exactly match corresponding -wallet option passed to raptoreumd)", false, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-stdin", "Read extra arguments from standard input, one per line until EOF/Ctrl-D (recommended for sensitive information such as passphrases).  When combined with -stdinrpcpass, the first line from standard input is used for the RPC password.", false, OptionsCategory::OPTIONS);
-//    gArgs.AddArg("-stdinrpcpass", strprintf("Read RPC password from standard input as a single line.  When combined with -stdin, the first line from standard input is used for the RPC password."), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("conf=<file>", strprintf("Specify configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("datadir=<dir>", "Specify data directory", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("getinfo", "Get general information from the remote server. Note that unlike server-side RPC calls, the results of -getinfo is the result of multiple non-atomic requests. Some entries in the result may represent results from different states (e.g. wallet balance may be as of a different block from the chain state reported)", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("named", strprintf("Pass named instead of positional arguments (default: %s)", DEFAULT_NAMED), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcclienttimeout=<n>", strprintf("Timeout in seconds during HTTP requests, or 0 for no timeout. (default: %d)", DEFAULT_HTTP_CLIENT_TIMEOUT), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcconnect=<ip>", strprintf("Send commands to node running on <ip> (default: %s)", DEFAULT_RPCCONNECT), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcpassword=<pw>", "Password for JSON-RPC connections", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcport=<port>", strprintf("Connect to JSON-RPC on <port> (default: %u or testnet: %u)", defaultBaseParams->RPCPort(), testnetBaseParams->RPCPort()), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcuser=<user>", "Username for JSON-RPC connections", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcwait", "Wait for RPC server to start", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("rpcwallet=<walletname>", "Send RPC for non-default wallet on RPC server (needs to exactly match corresponding -wallet option passed to raptoreumd)", false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("stdin", "Read extra arguments from standard input, one per line until EOF/Ctrl-D (recommended for sensitive information such as passphrases).  When combined with -stdinrpcpass, the first line from standard input is used for the RPC password.", false, OptionsCategory::OPTIONS);
+//    gArgs.AddArg("stdinrpcpass", strprintf("Read RPC password from standard input as a single line.  When combined with -stdin, the first line from standard input is used for the RPC password."), false, OptionsCategory::OPTIONS);
 
     SetupChainParamsBaseOptions();
 }
@@ -193,7 +194,7 @@ public:
     UniValue PrepareRequest(const std::string& method, const std::vector<std::string>& args) override
     {
         if (!args.empty()) {
-            throw std::runtime_error("-getinfo takes no arguments");
+            throw std::runtime_error("getinfo takes no arguments");
         }
         
 printf("RGP DEBUG GetinfoRequestHandler GETINFO new stuff \n");
@@ -255,7 +256,7 @@ public:
         
          //printf("RGP Debug PrepareRequest 001 \n");
         
-        if(gArgs.GetBoolArg("-named", DEFAULT_NAMED)) {
+        if(gArgs.GetBoolArg("named", DEFAULT_NAMED)) {
             params = RPCConvertNamedValues(method, args);
         } else {
             params = RPCConvertValues(method, args);
@@ -276,23 +277,25 @@ static UniValue CallRPC(BaseRequestHandler *rh, const std::string& strMethod, co
 {
     std::string host;
     
-    //printf("RGP Debug CallRPC 001 %s <string> \n", &strMethod[0] );
+    printf("RGP Debug CallRPC 001 %s <string> \n", &strMethod[0] );
     
     // In preference order, we choose the following for the port:
     //     1. -rpcport
-    //     2. port in -rpcconnect (ie following : in ipv4 or ]: in ipv6)
+    //     2. port in rpcconnect (ie following : in ipv4 or ]: in ipv6)
     //     3. default port for chain
     int port = 23980;
     // BaseParams().RPCPort();
-    SplitHostPort(gArgs.GetArg("-rpcconnect", DEFAULT_RPCCONNECT), port, host);
-    port = gArgs.GetArg("-rpcport", port);
+
+
+    SplitHostPort(gArgs.GetArg("rpcconnect", DEFAULT_RPCCONNECT), port, host);
+    port = gArgs.GetArg("rpcport", port);
 
     // Obtain event base
     raii_event_base base = obtain_event_base();
 
     // Synchronously look up hostname
     raii_evhttp_connection evcon = obtain_evhttp_connection_base(base.get(), host, port);
-    evhttp_connection_set_timeout(evcon.get(), gArgs.GetArg("-rpcclienttimeout", DEFAULT_HTTP_CLIENT_TIMEOUT));
+    evhttp_connection_set_timeout(evcon.get(), gArgs.GetArg("rpcclienttimeout", DEFAULT_HTTP_CLIENT_TIMEOUT));
 
     HTTPReply response;
     raii_evhttp_request req = obtain_evhttp_request(http_request_done, (void*)&response);
@@ -311,7 +314,7 @@ static UniValue CallRPC(BaseRequestHandler *rh, const std::string& strMethod, co
     
     bool failedToGetAuthCookie = false;
     
-    if (gArgs.GetArg("-rpcpassword", "") == "") 
+    if (gArgs.GetArg("rpcpassword", "") == "") 
     {
     //printf("RGP Debug CallRPC 006 \n");
         // Try fall back to cookie-based authentication if no password is provided
@@ -324,7 +327,7 @@ static UniValue CallRPC(BaseRequestHandler *rh, const std::string& strMethod, co
     else 
     {
     //printf("RGP Debug CallRPC 004 \n");
-        strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
+        strRPCUserColonPass = gArgs.GetArg("rpcuser", "") + ":" + gArgs.GetArg("rpcpassword", "");
     }
 
 if (failedToGetAuthCookie)
@@ -333,7 +336,7 @@ printf("RGP failed failedToGetAuthCookie \n" );
 strRPCUserColonPass = "jimmy:jimmy";
 }
 
-//printf("RGP DEBUG RPCPassword and RPC USER [%s] \n", &strRPCUserColonPass[0] );
+printf("RGP DEBUG RPCPassword and RPC USER [%s] \n", &strRPCUserColonPass[0] );
 
     struct evkeyvalq* output_headers = evhttp_request_get_output_headers(req.get());
     assert(output_headers);
@@ -344,7 +347,7 @@ strRPCUserColonPass = "jimmy:jimmy";
 
     // Attach request data
     std::string strRequest = rh->PrepareRequest(strMethod, args).write() + "\n";
-    //printf("RGP Debug CallRPC 011 returned by PrepareRequest [%s] \n", &strRequest[0] );
+    printf("RGP Debug CallRPC 011 returned by PrepareRequest [%s] \n", &strRequest[0] );
     
     struct evbuffer* output_buffer = evhttp_request_get_output_buffer(req.get());
 
@@ -354,8 +357,8 @@ strRPCUserColonPass = "jimmy:jimmy";
 
     // check if we should use a special wallet endpoint
     std::string endpoint = "/";
-    if (!gArgs.GetArgs("-rpcwallet").empty()) {
-        std::string walletName = gArgs.GetArg("-rpcwallet", "");
+    if (!gArgs.GetArgs("rpcwallet").empty()) {
+        std::string walletName = gArgs.GetArg("rpcwallet", "");
         char *encodedURI = evhttp_uriencode(walletName.c_str(), walletName.size(), false);
         if (encodedURI) {
             endpoint = "/wallet/"+ std::string(encodedURI);
@@ -371,11 +374,11 @@ strRPCUserColonPass = "jimmy:jimmy";
         throw CConnectionFailed("send http request failed");
     }
 
-        //printf("RGP Debug CallRPC 030 \n");
+        printf("RGP Debug CallRPC 030 \n");
 
     event_base_dispatch(base.get());
 
-        //printf("RGP Debug CallRPC 031 \n");
+        printf("RGP Debug CallRPC 031 \n");
 
 printf("RGP CallRPC buffer body  %s \n", &data[0] );
 
@@ -448,6 +451,7 @@ int CommandLineRPC(int argc, char *argv[])
     int nRet = 0;
     char *xxx = "CommandLineRPC";
    
+//printf("RGP CommandLineRPC start\n");
     
     try {
         // Skip switches
@@ -456,14 +460,14 @@ int CommandLineRPC(int argc, char *argv[])
             argv++;
         }
         std::string rpcPass;
-        if (gArgs.GetBoolArg("-stdinrpcpass", false)) {
+        if (gArgs.GetBoolArg("stdinrpcpass", false)) {
             if (!std::getline(std::cin, rpcPass)) {
-                throw std::runtime_error("-stdinrpcpass specified but failed to read from standard input");
+                throw std::runtime_error("stdinrpcpass specified but failed to read from standard input");
             }
-            gArgs.ForceSetArg("-rpcpassword", rpcPass);
+            gArgs.ForceSetArg("rpcpassword", rpcPass);
         }
         std::vector<std::string> args = std::vector<std::string>(&argv[1], &argv[argc]);
-        if (gArgs.GetBoolArg("-stdin", false)) {
+        if (gArgs.GetBoolArg("stdin", false)) {
             // Read one arg per line from stdin and append
             std::string line;
             while (std::getline(std::cin, line)) {
@@ -472,7 +476,14 @@ int CommandLineRPC(int argc, char *argv[])
         }
         std::unique_ptr<BaseRequestHandler> rh;
         std::string method;
-        if (gArgs.GetBoolArg("-getinfo", false)) {
+
+//printf("RGP CommandLineRPC before getinfo\n");
+
+        if (gArgs.GetBoolArg("getinfo", false)) 
+        {
+
+            printf("RGP CommandLineRPC requesting getinfo\n");
+
             rh.reset(new GetinfoRequestHandler());
             method = "";
         } else {
@@ -485,7 +496,7 @@ int CommandLineRPC(int argc, char *argv[])
         }
 
         // Execute and handle connection failures with -rpcwait
-        const bool fWait = gArgs.GetBoolArg("-rpcwait", false);
+        const bool fWait = gArgs.GetBoolArg("rpcwait", false);
         do {
             try {
             
@@ -514,7 +525,7 @@ int CommandLineRPC(int argc, char *argv[])
                             strPrint += "error message:\n"+errMsg.get_str();
 
                         if (errCode.isNum() && errCode.get_int() == RPC_WALLET_NOT_SPECIFIED) {
-                            strPrint += "\nTry adding \"-rpcwallet=<filename>\" option to raptoreum-cli command line.";
+                            strPrint += "\nTry adding \"rpcwallet=<filename>\" option to raptoreum-cli command line.";
                         }
                     }
                 } 
@@ -549,7 +560,7 @@ int CommandLineRPC(int argc, char *argv[])
     }
     catch (const std::exception& e) 
     {
-    printf("RGP ERROR Caught\n");
+    // printf("RGP ERROR Caught\n");
         strPrint = std::string("error: ") + e.what();
         nRet = EXIT_FAILURE;
     }

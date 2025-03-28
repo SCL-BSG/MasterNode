@@ -808,6 +808,13 @@ extern volatile bool fRequestShutdown;
         nanosleep(&ts, NULL);
         //MilliSleep(1000);
     }
+    
+    /* End of while, check if we are closing */
+    if ( fRequestShutdown )
+    {
+       printf("\n Bank Society Gold, WalletDB Process ending...");
+       MilliSleep(10000);
+    }
 }
 
 bool BackupWallet(const CWallet& wallet, const string& strDest)
